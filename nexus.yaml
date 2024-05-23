@@ -24,7 +24,7 @@ Parameters:
   # Fourth parameter is InstanceType
   InstanceType: 
     Type: String
-    Default: t2.micro
+    Default: t2.medium
 
 
 Mappings:
@@ -55,6 +55,7 @@ Resources:
       KeyName: !Ref KeyName
       # see above Parameters
       ImageId: !FindInMap 
+      # Fn::FindInMap:
         - AmiRegionMap
         #Logical ID of the Mapping
         - !Ref AWS::Region
@@ -85,55 +86,52 @@ Resources:
       # set up Jenkins on this EC2 instance
        Fn::Base64:  # YAML makes userdata much cleaner.
          !Sub |
-              #!/bin/bash
-              yum install java-1.8.0-openjdk.x86_64 wget -y   
-              yum install epel-release -y
-              yum install awscli -y
-              mkdir -p /opt/nexus/   
-              mkdir -p /tmp/nexus/                           
-              cd /tmp/nexus
-              NEXUSURL="https://download.sonatype.com/nexus/3/latest-unix.tar.gz"
-              wget $NEXUSURL -O nexus.tar.gz
-              EXTOUT=`tar xzvf nexus.tar.gz`
-              NEXUSDIR=`echo $EXTOUT | cut -d '/' -f1`
-              rm -rf /tmp/nexus/nexus.tar.gz
-              rsync -avzh /tmp/nexus/ /opt/nexus/
-              useradd nexus
-              chown -R nexus.nexus /opt/nexus 
-              cat <<EOT>> /etc/systemd/system/nexus.service
-              [Unit]                                                                          
-              Description=nexus service                                                       
-              After=network.target                                                            
-                                                                                
-              [Service]                                                                       
-              Type=forking                                                                    
-              LimitNOFILE=65536                                                               
-              ExecStart=/opt/nexus/$NEXUSDIR/bin/nexus start                                  
-              ExecStop=/opt/nexus/$NEXUSDIR/bin/nexus stop                                    
-              User=nexus                                                                      
-              Restart=on-abort                                                                
-                                                                                
-              [Install]                                                                       
-              WantedBy=multi-user.target                                                      
-
-              EOT
-
-              echo 'run_as_user="nexus"' > /opt/nexus/$NEXUSDIR/bin/nexus.rc
-              systemctl daemon-reload
-              systemctl start nexus
-              systemctl enable nexus
-              aws s3 cp s3://cicd-data-vprofile-project25/nexus-cicd-vpro-pro.tgz  /opt/
-              cd /opt/
-              sleep 5
-              systemctl stop nexus
-              sleep 10
-              tar xzvf nexus-cicd-vpro-pro.tgz 
-              chown nexus.nexus /opt/nexus -R
-              systemctl daemon-reload
-              systemctl start nexus
-              systemctl enable nexus
-              reboot
-
+             #!/bin/bash
+             yum install java-1.8.0-openjdk.x86_64 wget -y   
+             yum install epel-release -y
+             yum install awscli -y
+             mkdir -p /opt/nexus/   
+             mkdir -p /tmp/nexus/                           
+             cd /tmp/nexus
+             NEXUSURL="https://download.sonatype.com/nexus/3/latest-unix.tar.gz"
+             wget $NEXUSURL -O nexus.tar.gz
+             EXTOUT=`tar xzvf nexus.tar.gz`
+             NEXUSDIR=`echo $EXTOUT | cut -d '/' -f1`
+             rm -rf /tmp/nexus/nexus.tar.gz
+             rsync -avzh /tmp/nexus/ /opt/nexus/
+             useradd nexus
+             chown -R nexus.nexus /opt/nexus 
+             cat <<EOT>> /etc/systemd/system/nexus.service
+             [Unit]                                                                          
+             Description=nexus service                                                       
+             After=network.target                                                            
+                                                                               
+             [Service]                                                                       
+             Type=forking                                                                    
+             LimitNOFILE=65536                                                               
+             ExecStart=/opt/nexus/$NEXUSDIR/bin/nexus start                                  
+             ExecStop=/opt/nexus/$NEXUSDIR/bin/nexus stop                                    
+             User=nexus                                                                      
+             Restart=on-abort                                                                
+                                                                               
+             [Install]                                                                       
+             WantedBy=multi-user.target                                                       
+             EOT 
+             echo 'run_as_user="nexus"' > /opt/nexus/$NEXUSDIR/bin/nexus.rc
+             systemctl daemon-reload
+             systemctl start nexus
+             systemctl enable nexus
+             aws s3 cp s3://cicd-data-vprofile-project25/nexus-cicd-vpro-pro.tgz  /opt/
+             cd /opt/
+             sleep 5
+             systemctl stop nexus
+             sleep 10
+             tar xzvf nexus-cicd-vpro-pro.tgz 
+             chown nexus.nexus /opt/nexus -R
+             systemctl daemon-reload
+             systemctl start nexus
+             systemctl enable nexus
+             reboot 
 
   # Second resource is the security group
   nexuSG:
@@ -152,26 +150,38 @@ Resources:
           ToPort: '8081'
           CidrIp: !Ref MyIP
 
-  # Jenkins needs to upload the artifact from nexux so Jenkins needs access to the Nexus server
+  # Jenkins needs to upload the artifact from nexus so Jenkins needs access to the Nexus server
   # Use a new Resource to inject the addtional ingress rule into the nexusSG above
-  vpronexusSBIngress:
+  vpronexusSGIngress:
     Type: 'AWS::EC2::SecurityGroupIngress'
     Properties:
       GroupId: 
         Fn::GetAtt:
           - nexusSG
           - GroupId
-          # !GetAtt=nexusSG.GroupId
+          # !GetAtt nexusSG.GroupId
           # This gets the security group ID of the nexusSG above. We will be appending another ingress
           # rule to this SG
+          # long hand vs. short hand syntax
+          # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-getatt.html
+          # Fn::GetAtt: [ logicalNameOfResource, attributeName ]
+          # !GetAtt logicalNameOfResource.attributeName
       IpProtocol: tcp
       FromPort: '8081'
       ToPort: '8081'
       SourceSecurityGroupId:
        Fn::Importvalue:
+       # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-importvalue.html
         Fn::Sub: "{$JenkStackName}-SGID"
         # JenkStackName is defined above in Parameters
         # This will give us the jenk-SGID which is exported from the jenk.yaml template.
-
-
-
+        # long hand vs. short hand syntax
+        # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-sub.html
+        # Fn::Sub:
+        #   - String
+        #   - Var1Name: Var1Value
+        #     Var2Name: Var2Value
+        # !Sub
+        #    - String
+        #    - Var1Name: Var1Value
+        #      Var2Name: Var2Value

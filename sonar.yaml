@@ -1,0 +1,280 @@
+Parameters:
+  RoleTempName:
+    Description: Name of the base stack with all infra resources
+    Type: String
+    Default: cicds3role
+    # this is the name of the template and we are getting the export from the cicds3role.yaml which is
+    # cicds3role-VPS3RoleProfileName variable. The data will be !Ref VPInstanceProfile of that template file.
+    # this is used in NexusInst resource below
+
+  JenkStackName:
+    Description: Name of the base stack with all infra resources
+    Type: String
+    Default: jenk
+    # This is the name of the tempalte jenk.yaml and we are getting the export from the template
+    # The exported data is jenk-SGID forvpronexusSBIngress below to append the additonal rule to the nexusSG
+    # that permits Jenkins to access Nexus server to upload the artfact from Nexus.
+
+  # The root (master) template is sending 2 parameters to this child template: MyIP and KeyName
+  MyIP:
+    Type: String
+  KeyName:
+    Type: String
+
+  # Fourth parameter is InstanceType
+  InstanceType: 
+    Type: String
+    Default: t2.medium
+
+
+Mappings:
+# ubuntu 18.  Use ubuntu 22
+  AmiRegionMap:
+  #Logical ID of the mappings
+    us-east-1: 
+      AMI: "ami-0e001c9271cf7f3b9"
+    us-west-1: 
+      AMI: "ami-036cafe742923b3d9"
+    us-east-2: 
+      AMI: "ami-0f30a9c3a48f3fa79"
+    us-west-2: 
+      AMI: "ami-03c983f9003cb9cd1"
+    ap-northeast-1: 
+      AMI: "ami-0595d6e81396a9efb"
+
+
+Resources:
+# these are the resources for the EC2 instance
+# First resouce is instance
+  SonarInst:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: !Ref InstanceType
+      # see above Parameters
+      KeyName: !Ref KeyName
+      # see above Parameters
+      ImageId: !FindInMap 
+      # Fn:: FindInMap:
+        - AmiRegionMap
+        #Logical ID of the Mapping
+        - !Ref AWS::Region
+        # dynamic region variable
+        - AMI
+        # subkey of the mapping
+      Tags:
+        - Key: "Name"
+          Value: !Join
+            - ""
+            - - "SonarServer in "
+              - !Ref AWS::Region
+      SecurityGroups:
+        - !Ref sonarSG
+        # see below for security group
+
+      IamInstanceProfile:
+        # this is from cicds3role.yaml
+        Fn::Importvalue:
+          Fn::Sub: "${RoleTempName}-VPS3RoleProfileName"
+          # RoleTempName is specified in the Parameters and is the VPInstanceProfile data from cicds3role.yaml
+          # this is the exported variable VPS3RoleProfileName from cicds3role.yaml 
+          # This value will be stored in IamInstanceProfile and attached to this instance.
+          # This will give S3 full access so that the instance can download data from the S3 bucket (see below)
+      
+      Userdata:
+      # set up Jenkins on this EC2 instance
+       Fn::Base64:  # YAML makes userdata much cleaner.
+         !Sub |
+             #!/bin/bash
+             cp /etc/sysctl.conf /root/sysctl.conf_backup
+             cat <<EOT> /etc/sysctl.conf
+             vm.max_map_count=262144
+             fs.file-max=65536
+             ulimit -n 65536
+             ulimit -u 4096
+             EOT
+             cp /etc/security/limits.conf /root/sec_limit.conf_backup
+             cat <<EOT> /etc/security/limits.conf
+             sonarqube   -   nofile   65536
+             sonarqube   -   nproc    409
+             EOT 
+             sudo apt-get update -y
+             sudo apt-get install openjdk-11-jdk -y
+             sudo update-alternatives --config java
+             java -version 
+             sudo apt update
+             wget -q https://www.postgresql.org/media/keys/ACCC4CF8.asc -O - | sudo apt-key add - 
+             sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" >> /etc/apt/sources.list.d/pgdg.list'
+             sudo apt install postgresql postgresql-contrib -y
+             #sudo -u postgres psql -c "SELECT version();"
+             sudo systemctl enable postgresql.service
+             sudo systemctl start  postgresql.service
+             sudo echo "postgres:admin123" | chpasswd
+             runuser -l postgres -c "createuser sonar"
+             sudo -i -u postgres psql -c "ALTER USER sonar WITH ENCRYPTED PASSWORD 'admin123';"
+             sudo -i -u postgres psql -c "CREATE DATABASE sonarqube OWNER sonar;"
+             sudo -i -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE sonarqube to sonar;"
+             systemctl restart  postgresql
+             #systemctl status -l   postgresql
+             netstat -tulpena | grep postgres
+             sudo mkdir -p /sonarqube/
+             cd /sonarqube/
+             sudo curl -O https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-8.3.0.34182.zip
+             sudo apt-get install zip -y
+             sudo unzip -o sonarqube-8.3.0.34182.zip -d /opt/
+             sudo mv /opt/sonarqube-8.3.0.34182/ /opt/sonarqube
+             sudo groupadd sonar
+             sudo useradd -c "SonarQube - User" -d /opt/sonarqube/ -g sonar sonar
+             sudo chown sonar:sonar /opt/sonarqube/ -R
+             cp /opt/sonarqube/conf/sonar.properties /root/sonar.properties_backup
+             cat <<EOT> /opt/sonarqube/conf/sonar.properties
+             sonar.jdbc.username=sonar
+             sonar.jdbc.password=admin123
+             sonar.jdbc.url=jdbc:postgresql://localhost/sonarqube
+             sonar.web.host=0.0.0.0
+             sonar.web.port=9000
+             sonar.web.javaAdditionalOpts=-server
+             sonar.search.javaOpts=-Xmx512m -Xms512m -XX:+HeapDumpOnOutOfMemoryError
+             sonar.log.level=INFO
+             sonar.path.logs=logs
+             EOT 
+             cat <<EOT> /etc/systemd/system/sonarqube.service
+             [Unit]
+             Description=SonarQube service
+             After=syslog.target network.target 
+             [Service]
+             Type=forking 
+             ExecStart=/opt/sonarqube/bin/linux-x86-64/sonar.sh start
+             ExecStop=/opt/sonarqube/bin/linux-x86-64/sonar.sh stop 
+             User=sonar
+             Group=sonar
+             Restart=always 
+             LimitNOFILE=65536
+             LimitNPROC=4096 
+             [Install]
+             WantedBy=multi-user.target
+             EOT
+             
+             systemctl daemon-reload
+             systemctl enable sonarqube.service
+             systemctl start sonarqube.service
+             apt-get install nginx -y
+             rm -rf /etc/nginx/sites-enabled/default
+             rm -rf /etc/nginx/sites-available/default
+             cat <<EOT> /etc/nginx/sites-available/sonarqube
+             server{
+                 listen      80;
+                 server_name sonarqube.groophy.in;
+             
+                 access_log  /var/log/nginx/sonar.access.log;
+                 error_log   /var/log/nginx/sonar.error.log;
+             
+                 proxy_buffers 16 64k;
+                 proxy_buffer_size 128k;
+             
+                 location / {
+                     proxy_pass  http://127.0.0.1:9000;
+                     proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+                     proxy_redirect off;
+                           
+                     proxy_set_header    Host            \$host;
+                     proxy_set_header    X-Real-IP       \$remote_addr;
+                     proxy_set_header    X-Forwarded-For \$proxy_add_x_forwarded_for;
+                     proxy_set_header    X-Forwarded-Proto http;
+                 }
+             }
+             EOT
+             ln -s /etc/nginx/sites-available/sonarqube /etc/nginx/sites-enabled/sonarqube
+             systemctl enable nginx.service
+             #systemctl restart nginx.service
+             sudo ufw allow 80,9000,9001/tcp
+             systemctl stop sonarqube
+             systemctl stop postgresql
+             sleep 10
+             apt install awscli -y
+             aws s3 cp s3://cicd-data-vprofile-project25/sonarqube-vpro-pro-data.tgz /opt/              
+             cd /opt/
+             tar xzvf sonarqube-vpro-pro-data.tgz
+             sudo chown sonar:sonar /opt/sonarqube/ -R
+             aws s3 cp s3://cicd-data-vprofile-project25/postgresql_sonar.tgz  /var/lib/
+             cd /var/lib
+             tar xzvf postgresql_sonar.tgz 
+             chown postgres.postgres /var/lib/postgresql -R
+             systemctl start postgresql
+             systemctl start sonarqube
+             sleep 10              
+             reboot 
+
+
+  # Second resource is the security group
+  sonarSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: JenkinsSG
+      GroupDescription: Allow SSH & HTTP from  MyIP
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: !Ref MyIP
+
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: !Ref MyIP
+
+  # Jenkins needs to upload the reports from SonarServer so Jenkins needs access to the Sonar server
+  # Use a new Resource to inject the addtional ingress rule into the nexusSG above
+  sonarSGIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: 
+        Fn::GetAtt:
+          - sonarSG
+          - GroupId
+          # !GetAtt sonarSG.GroupId
+          # This gets the security group ID of the sonarSG above. We will be appending another ingress
+          # rule to this SG
+          # long hand vs. short hand syntax
+          # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-getatt.html
+          # Fn::GetAtt: [ logicalNameOfResource, attributeName ]
+          # !GetAtt logicalNameOfResource.attributeName
+      IpProtocol: -1
+      # all traffic from Jenkins to sonar will be allowed
+      SourceSecurityGroupId:
+       Fn::Importvalue:
+       # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-importvalue.html
+        Fn::Sub: "{$JenkStackName}-SGID"
+        # JenkStackName is defined above in Parameters
+        # This will give us the jenk-SGID which is exported from the jenk.yaml template.
+        # long hand vs. short hand syntax
+        # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-sub.html
+        # Fn::Sub:
+        #   - String
+        #   - Var1Name: Var1Value
+        #     Var2Name: Var2Value
+        # !Sub
+        #    - String
+        #    - Var1Name: Var1Value
+        #      Var2Name: Var2Value
+  
+  
+  # update the Jenkins SG from the sonar.yaml. This is because sonar server needs access to Jenkins. Sonar has to 
+  # update Jenkins with the final result after testing the sofltward
+  JenkinsSGIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: 
+        Fn::Importvalue:
+          Fn::Sub: "${JenkStackName}-SGID"
+          # This is the SG id of the Jenkins security group. Since we are updating the Jenkins SG from sonar.yaml we need
+          # to import the Jenkins SG
+      IpProtocol: -1
+      # all traffic from sonar to Jenkins will be allowed
+      SourceSecurityGroupId:
+        Fn::GetAtt:
+        # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-importvalue.html
+          - sonarSG
+          - GroupId
+          # This is the security group id of the sonar server for the source of the traffic. Rule is for sonar to jenkins traffic
+
+          
