@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: "2010-09-09"
+# source: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
+Resources:
+  VPS3Role:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      # add a role name
+      RoleName: vpr-cicd-data-s3
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: vps3fullaccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: '*'
+                #Resource: '*'
+                Resource: 'arn:aws:s3:::*'
+  
+  VPInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      InstanceProfileName: vpr-cicd-data-s3
+      # see above
+      Path: /
+      Roles:
+        - !Ref VPS3Role
+
+
+# Export the role above so that it can be used in the Jenkins template and applied to the Jenkins EC2 nstance
+Outputs:
+  VPs3roleDetails:
+    Description: VP CICD Pro s3 role info
+    Value: !Ref VPInstanceProfile
+    # See above. VPInstanceProfile
+    Export:
+      Name: cicds3role-VPS3RoleProfileName
+      # Name is format of <the stack name>-<name of the export>

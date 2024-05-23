@@ -1,0 +1,71 @@
+Parameters:
+  KeyPair:
+    Description: cicd stack key
+      Type: AWS::EC2::KeyPair::KeyName
+  MyIP:
+    Description: Assigning IP
+      Type: String
+      Default: 73.202.0.0/16
+
+Resources:
+# nested stack templates https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-nested-stacks.html
+  S3RoleforCiCd:
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template
+
+  JenkinsInst:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: S3RoleforCiCd
+    # this stack will not be created before the S3 stack
+    Properties: 
+      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template
+      Parameters:
+      # pass the variables to this stack
+        KeyName: !Ref KeyPair
+        MyIP: !Ref MyIP
+
+  App01qa:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: JenkinsInst
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template
+      Parameters:
+        KeyName: !Ref KeyPair
+        MyIP: !Ref MyIP
+
+  NexusServer:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: JenkinsInst
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template
+      Parameters:
+        KeyName: !Ref KeyPair
+        MyIP: !Ref MyIP
+
+  SonarServer:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: JenkinsInst
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template
+      Parameters:
+        KeyName: !Ref KeyPair
+        MyIP: !Ref MyIP
+
+  db01qa:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: App01qa
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template
+      Parameters:
+        KeyName: !Ref KeyPair
+        MyIP: !Ref MyIP
+
+  WintestServer:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: JenkinsInst
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template
+      Parameters:
+        KeyName: !Ref KeyPair
+        MyIP: !Ref MyIP

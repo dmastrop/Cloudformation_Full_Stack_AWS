@@ -1,0 +1,131 @@
+Parameters:
+  RoleTempName:
+    Description: Name of the base stack with all infra resources
+    Type: String
+    Default: cicds3role
+    # this is the name of the template and we are getting the export from the cicds3role.yaml which is
+    # cicds3role-VPS3RoleProfileName variable. The data will be !Ref VPInstanceProfile of that template file.
+
+  # The root (master) template is sending 2 parameters to this child template: MyIP and KeyName
+  MyIP:
+    Type: String
+  KeyName:
+    Type: String
+
+  # Fourth parameter is InstanceType
+  InstanceType: 
+    Type: String
+    Default: t2.micro
+
+
+Mappings:
+# ubuntu 18.  Use ubuntu 22
+  AmiRegionMap:
+  #Logical ID of the mappings
+    us-east-1: 
+      AMI: "ami-0e001c9271cf7f3b9"
+    us-west-1: 
+      AMI: "ami-036cafe742923b3d9"
+    us-east-2: 
+      AMI: "ami-0f30a9c3a48f3fa79"
+    us-west-2: 
+      AMI: "ami-03c983f9003cb9cd1"
+    ap-northeast-1: 
+      AMI: "ami-0595d6e81396a9efb"
+
+
+Resources:
+# these are the resources for the EC2 instance
+# First resouce is instance
+  JenkinsInst:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: !Ref InstanceType
+      # see above Parameters
+      KeyName: !Ref KeyName
+      # see above Parameters
+      ImageId: !FindInMap 
+        - AmiRegionMap
+        #Logical ID of the Mapping
+        - !Ref AWS::Region
+        # dynamic region variable
+        - AMI
+        # subkey of the mapping
+      Tags:
+        - Key: "Name"
+          Value: !Join
+            - ""
+            - - "Jenkins in "
+              - !Ref AWS::Region
+      SecurityGroups:
+        - !Ref JenkinsSG
+        # see below for security group
+
+      IamInstanceProfile:
+        # this is from cicds3role.yaml
+        Fn::Importvalue:
+          Fn::Sub: "${RoleTempName}-VPS3RoleProfileName"
+          # RoleTempName is specified in the Parameters and is the VPInstanceProfile data from cicds3role.yaml
+          # this is the exported variable VPS3RoleProfileName from cicds3role.yaml 
+          # This value will be stored in IamInstanceProfile and attached to this instance.
+          # This will give S3 full access so that the instance can download data from the S3 bucket (see below)
+      
+      Userdata:
+      # set up Jenkins on this EC2 instance
+       Fn::Base64:  # YAML makes userdata much cleaner.
+         !Sub |
+              #!/bin/bash
+              sudo apt update
+              sudo apt install openjdk-8-jdk -y
+              sudo apt install maven git wget unzip -y
+              sudo apt install awscli -y
+              wget -q -O - https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo apt-key add -
+              sudo sh -c 'echo deb https://pkg.jenkins.io/debian-stable binary/ > /etc/apt/sources.list.d/jenkins.list'
+              sudo apt-get update
+              sudo apt-get install jenkins -y
+              sleep 10
+              systemctl stop jenkins
+              sleep 10
+              aws s3 cp s3://cicd-data-vprofile/jenkins_cicdjobs.tar.gz /var/lib/
+              cd /var/lib/
+              tar xzvf jenkins_cicdjobs.tar.gz
+              chown jenkins.jenkins /var/lib/jenkins -R
+              reboot 
+
+  # Second resource is the security group
+  JenkinsSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: JenkinsSG
+      GroupDescription: Allow SSH & HTTP from  MyIP
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: !Ref MyIP
+
+        - IpProtocol: tcp
+          FromPort: '8080'
+          ToPort: '8080'
+          CidrIp: 0.0.0.0/0
+
+
+Outputs:
+  MyEC2InstancePublicIP:
+    Value: !GetAtt JenkinsInst.PublicIp
+  MyEC2InstancePrivateIP:
+    Value: !GetAtt JenkinsInst.PrivateIP
+  MyEC2InstanceID:
+    Value: !Ref JenkinsInst
+
+  # Need the Jenkins SG id to export it to the next template so that it can use it in its Security Group
+  JenkSecurityGroupId:
+    Description: Security Group1 ID
+    Value: 
+      Fn::GetAtt:
+        - JenkinsSG
+        - GroupId
+        # !GetAtt JenkinsSG.GroupId
+    Export:
+      Name: jenk-SGID
+      # Export the !GetAtt JenkinsSG.GroupId value and assign it to the variable jenk-SGID
