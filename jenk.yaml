@@ -86,7 +86,7 @@ Resources:
               sleep 10
               systemctl stop jenkins
               sleep 10
-              aws s3 cp s3://cicd-data-vprofile/jenkins_cicdjobs.tar.gz /var/lib/
+              aws s3 cp s3://cicd-data-vprofile-project25/jenkins_cicdjobs.tar.gz /var/lib/
               cd /var/lib/
               tar xzvf jenkins_cicdjobs.tar.gz
               chown jenkins.jenkins /var/lib/jenkins -R
