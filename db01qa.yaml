@@ -1,0 +1,163 @@
+# This provisions the mysql db and the memcached and the rabbitmq services
+
+Parameters:
+  appStackName:
+    Description: Name of the base stack with all infra resources
+    Type: String
+    Default: app01qa
+
+  # RoleTempName:
+  #   Description: Name of the base stack with all infra resources
+  #   Type: String
+  #   Default: cicds3role
+  #   # this is the name of the template and we are getting the export from the cicds3role.yaml which is
+  #   # cicds3role-VPS3RoleProfileName variable. The data will be !Ref VPInstanceProfile of that template file.
+  #   # this is used in NexusInst resource below
+
+  # JenkStackName:
+  #   Description: Name of the base stack with all infra resources
+  #   Type: String
+  #   Default: jenk
+  #   # This is the name of the tempalte jenk.yaml and we are getting the export from the template
+  #   # The exported data is jenk-SGID forvpronexusSBIngress below to append the additonal rule to the nexusSG
+  #   # that permits Jenkins to access Nexus server to upload the artfact from Nexus.
+
+  # The root (master) template is sending 2 parameters to this child template: MyIP and KeyName
+  MyIP:
+    Type: String
+  KeyName:
+    Type: String
+
+  # Fourth parameter is InstanceType
+  InstanceType: 
+    Type: String
+    Default: t2.small
+
+
+Mappings:
+# Need CentOS 7 or above. The AMIs below are CentOS stream 8
+  AmiRegionMap:
+  #Logical ID of the mappings
+    us-east-1: 
+      AMI: "ami-0cdb8266fcd5d3d63"
+    us-west-1: 
+      AMI: "ami-0789ea4ecdab43447"
+    us-east-2: 
+      AMI: "ami-013f9ee48907190f5"
+    us-west-2: 
+      AMI: "ami-031e6a417aae9b9f6"
+    ap-northeast-1: 
+      AMI: "ami-0270524b69d8dc369"
+
+
+Resources:
+  DB01qaInst:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      ImageId: !FindInMap
+#        Fn::FindInMap:
+        - AmiRegionMap
+        - !Ref AWS::Region
+        - AMI
+      Tags:
+        - Key: "Name"
+          Value: !Join 
+            - ""
+            - - "db01-qa-vpro in "
+              - !Ref AWS::Region
+      SecurityGroups: 
+        - !Ref vprodbSG
+
+      IamInstanceProfile:
+        # this is from cicds3role.yaml
+        Fn::Importvalue:
+          Fn::Sub: "${RoleTempName}-VPS3RoleProfileName"
+          # RoleTempName is specified in the Parameters and is the VPInstanceProfile data from cicds3role.yaml
+          # this is the exported variable VPS3RoleProfileName from cicds3role.yaml 
+          # This value will be stored in IamInstanceProfile and attached to this instance.
+          # This will give S3 full access so that the instance can download data from the S3 bucket (see below)
+      
+      UserData:
+        Fn::Base64:                                # YAML makes userdata much cleaner
+          !Sub |
+              #!/bin/bash
+              DATABASE_PASS='admin123'
+              yum update -y
+              yum install epel-release -y
+              yum install mariadb-server -y
+              yum install wget git unzip -y
+
+              #mysql_secure_installation
+              sed -i 's/^127.0.0.1/0.0.0.0/' /etc/my.cnf
+
+              # starting & enabling mariadb-server
+              systemctl start mariadb
+              systemctl enable mariadb
+
+              #restore the dump file for the application
+              cd /tmp/
+              wget https://raw.githubusercontent.com/devopshydclub/vprofile-repo/vp-rem/src/main/resources/db_backup.sql
+              mysqladmin -u root password "$DATABASE_PASS"
+              mysql -u root -p"$DATABASE_PASS" -e "UPDATE mysql.user SET Password=PASSWORD('$DATABASE_PASS') WHERE User='root'"
+              mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
+              mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.user WHERE User=''"
+              mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%'"
+              mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES"
+              mysql -u root -p"$DATABASE_PASS" -e "create database accounts"
+              mysql -u root -p"$DATABASE_PASS" -e "grant all privileges on accounts.* TO 'admin'@'localhost' identified by 'admin123'"
+              mysql -u root -p"$DATABASE_PASS" -e "grant all privileges on accounts.* TO 'admin'@'%' identified by 'admin123'"
+              mysql -u root -p"$DATABASE_PASS" accounts < /tmp/db_backup.sql
+              mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES"
+
+              # Restart mariadb-server
+              systemctl restart mariadb
+              # SETUP MEMCACHE
+              yum install memcached -y
+              systemctl start memcached
+              systemctl enable memcached
+              systemctl status memcached
+              memcached -p 11211 -U 11111 -u memcached -d
+              sleep 30
+              yum install socat -y
+              yum install wget -y
+              wget https://www.rabbitmq.com/releases/rabbitmq-server/v3.6.10/rabbitmq-server-3.6.10-1.el7.noarch.rpm
+              rpm --import https://www.rabbitmq.com/rabbitmq-release-signing-key.asc
+              yum update
+              rpm -Uvh rabbitmq-server-3.6.10-1.el7.noarch.rpm
+              systemctl start rabbitmq-server
+              systemctl enable rabbitmq-server
+              systemctl status rabbitmq-server
+              echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
+              rabbitmqctl add_user test test
+              rabbitmqctl set_user_tags test administrator
+              systemctl restart rabbitmq-server
+
+
+  vprodbSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: vprodbSG
+      GroupDescription: Allow SSH & HTTP from myip
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: !Ref MyIP
+
+  # The app tomcat server needs access to the database, memcached, and rabbitmq services on all protocols
+  vprodbSGIngress:
+   Type: 'AWS::EC2::SecurityGroupIngress'
+   Properties:
+      GroupId: 
+        Fn::GetAtt:
+        - vprodbSG
+        - GroupId
+      IpProtocol: -1
+      # all  protocols
+      SourceSecurityGroupId:
+        Fn::ImportValue:
+            Fn::Sub: "${appStackName}-SGID"
+            # This returns the app01qa-SGID from teh app01qa.yaml file
+  
