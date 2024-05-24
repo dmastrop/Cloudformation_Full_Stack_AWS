@@ -65,7 +65,7 @@ Resources:
       
       IamInstanceProfile:
         # this is from cicds3role.yaml
-        Fn::Importvalue:
+        Fn::ImportValue:
           Fn::Sub: "${RoleTempName}-VPS3RoleProfileName"
           # RoleTempName is specified in the Parameters and is the VPInstanceProfile data from cicds3role.yaml
           # this is the exported variable VPS3RoleProfileName from cicds3role.yaml 
@@ -115,7 +115,7 @@ Resources:
       IpProtocol: -1
       # all traffic from Jenkins to sonar will be allowed
       SourceSecurityGroupId:
-       Fn::Importvalue:
+       Fn::ImportValue:
        # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-importvalue.html
         Fn::Sub: "{$JenkStackName}-SGID"
         # JenkStackName is defined above in Parameters
@@ -137,7 +137,7 @@ Resources:
     Type: 'AWS::EC2::SecurityGroupIngress'
     Properties:
       GroupId: 
-        Fn::Importvalue:
+        Fn::ImportValue:
           Fn::Sub: "${JenkStackName}-SGID"
           # This is the SG id of the Jenkins security group. Since we are updating the Jenkins SG from wintest.yaml we need
           # to import the Jenkins SG

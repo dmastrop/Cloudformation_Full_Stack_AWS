@@ -72,7 +72,7 @@ Resources:
 
       IamInstanceProfile:
         # this is from cicds3role.yaml
-        Fn::Importvalue:
+        Fn::ImportValue:
           Fn::Sub: "${RoleTempName}-VPS3RoleProfileName"
           # RoleTempName is specified in the Parameters and is the VPInstanceProfile data from cicds3role.yaml
           # this is the exported variable VPS3RoleProfileName from cicds3role.yaml 
