@@ -1,11 +1,11 @@
 Parameters:
   KeyPair:
     Description: cicd stack key
-      Type: AWS::EC2::KeyPair::KeyName
+    Type: AWS::EC2::KeyPair::KeyName
   MyIP:
     Description: Assigning IP
-      Type: String
-      Default: 73.202.0.0/16
+    Type: String
+    Default: 73.202.0.0/16
 
 Resources:
 # nested stack templates https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-nested-stacks.html
