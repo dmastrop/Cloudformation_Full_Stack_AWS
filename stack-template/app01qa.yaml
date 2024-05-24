@@ -152,7 +152,7 @@ Resources:
       SourceSecurityGroupId:
        Fn::ImportValue:
        # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-importvalue.html
-        Fn::Sub: "{$JenkStackName}-SGID"
+        Fn::Sub: "${JenkStackName}-SGID"
         # JenkStackName is defined above in Parameters
         # This will give us the jenk-SGID which is exported from the jenk.yaml template.
         # long hand vs. short hand syntax
