@@ -64,11 +64,11 @@ Resources:
         # subkey of the mapping
       Tags:
         - Key: "Name"
-          Value: "Nexus Server"
-          # Value: !Join
-          #   - ""
-          #   - - "Jenkins in "
-          #     - !Ref AWS::Region
+          #Value: "Nexus Server"
+          Value: !Join
+            - ""
+            - - "Nexus in "
+              - !Ref AWS::Region
       SecurityGroups:
         - !Ref nexusSG
         # see below for security group

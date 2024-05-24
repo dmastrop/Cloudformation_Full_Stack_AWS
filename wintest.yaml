@@ -1,0 +1,151 @@
+Parameters:
+  RoleTempName:
+    Description: Name of the base stack with all infra resources
+    Type: String
+    Default: cicds3role
+    # this is the name of the template and we are getting the export from the cicds3role.yaml which is
+    # cicds3role-VPS3RoleProfileName variable. The data will be !Ref VPInstanceProfile of that template file.
+    # this is used in NexusInst resource below
+
+  JenkStackName:
+    Description: Name of the base stack with all infra resources
+    Type: String
+    Default: jenk
+    # This is the name of the tempalte jenk.yaml and we are getting the export from the template
+    # The exported data is jenk-SGID forvpronexusSBIngress below to append the additonal rule to the nexusSG
+    # that permits Jenkins to access Nexus server to upload the artfact from Nexus.
+
+  # The root (master) template is sending 2 parameters to this child template: MyIP and KeyName
+  MyIP:
+    Type: String
+  KeyName:
+    Type: String
+
+  # Fourth parameter is InstanceType
+  InstanceType: 
+    Type: String
+    Default: t2.small
+
+
+Mappings:
+# windows server: Microsoft Windows Server 2022 Full Locale English AMI provided by Amazon, Base
+  AmiRegionMap:
+  #Logical ID of the mappings
+    us-east-1: 
+      AMI: "ami-0069eac59d05ae12b"
+    us-west-1: 
+      AMI: "ami-0e6552a39ee0995d6"
+    us-east-2: 
+      AMI: "ami-087fc1aada380df36"
+    us-west-2: 
+      AMI: "ami-07cccf2bd80ed467f"
+    ap-northeast-1: 
+      AMI: "ami-01a8ef944f58a13cd"
+
+
+Resources:
+  WintestInst:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      ImageId: !FindInMap 
+      # Fn::FindInMap:
+        - AmiRegionMap
+        - !Ref AWS::Region
+        - AMI
+      Tags:
+        - Key: "Name"
+          Value: !Join
+            - ""
+            - - "Wintest in "
+              - !Ref AWS::Region
+      SecurityGroups:
+        - !Ref windtestSG
+      
+      IamInstanceProfile:
+        # this is from cicds3role.yaml
+        Fn::Importvalue:
+          Fn::Sub: "${RoleTempName}-VPS3RoleProfileName"
+          # RoleTempName is specified in the Parameters and is the VPInstanceProfile data from cicds3role.yaml
+          # this is the exported variable VPS3RoleProfileName from cicds3role.yaml 
+          # This value will be stored in IamInstanceProfile and attached to this instance.
+          # This will give S3 full access so that the instance can download data from the S3 bucket (see below)
+
+      UserData:
+        Fn::Base64:                                # YAML makes userdata much cleaner. This is 
+          !Sub |
+              <powershell>
+              Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+              choco install jdk8 -y 
+              choco install maven -y 
+              choco install googlechrome -y
+              choco install git -y
+              mkdir C:\jenkins
+              </powershell>
+
+
+  wintestSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: wintestSG
+      GroupDescription: Allow SSH & HTTP from MyIP
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '3389'
+          ToPort: '3389'
+          CidrIp: !Ref MyIP
+      
+  # Jenkins needs all protocol traffic access to the wintest server
+  # Use a new Resource to inject the addtional ingress rule into the wintestSG above
+  wintestSGIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: 
+        Fn::GetAtt:
+          - wintestSG
+          - GroupId
+          # !GetAtt wintestSG.GroupId
+          # This gets the security group ID of the wintestSG above. We will be appending another ingress
+          # rule to this SG
+          # long hand vs. short hand syntax
+          # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-getatt.html
+          # Fn::GetAtt: [ logicalNameOfResource, attributeName ]
+          # !GetAtt logicalNameOfResource.attributeName
+      IpProtocol: -1
+      # all traffic from Jenkins to sonar will be allowed
+      SourceSecurityGroupId:
+       Fn::Importvalue:
+       # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-importvalue.html
+        Fn::Sub: "{$JenkStackName}-SGID"
+        # JenkStackName is defined above in Parameters
+        # This will give us the jenk-SGID which is exported from the jenk.yaml template.
+        # long hand vs. short hand syntax
+        # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-sub.html
+        # Fn::Sub:
+        #   - String
+        #   - Var1Name: Var1Value
+        #     Var2Name: Var2Value
+        # !Sub
+        #    - String
+        #    - Var1Name: Var1Value
+        #      Var2Name: Var2Value
+  
+  
+  # update the Jenkins SG from the wintest.yaml. This is because wintest server needs access to Jenkins. 
+  JenkinsSGIngress:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: 
+        Fn::Importvalue:
+          Fn::Sub: "${JenkStackName}-SGID"
+          # This is the SG id of the Jenkins security group. Since we are updating the Jenkins SG from wintest.yaml we need
+          # to import the Jenkins SG
+      IpProtocol: -1
+      # all traffic from sonar to Jenkins will be allowed
+      SourceSecurityGroupId:
+        Fn::GetAtt:
+        # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-importvalue.html
+          - wintestSG
+          - GroupId
+          # This is the security group id of the wintest server for the source of the traffic. Rule is for wintest to jenkins traffic
