@@ -134,7 +134,7 @@ Resources:
       #        reboot 
 
   # Second resource is the security group
-  nexuSG:
+  nexusSG:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
       GroupName: nexusSG
