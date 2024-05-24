@@ -12,14 +12,14 @@ Resources:
   S3RoleforCiCd:
     Type: AWS::CloudFormation::Stack
     Properties: 
-      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template
+      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template/cicds3role.yaml
 
   JenkinsInst:
     Type: AWS::CloudFormation::Stack
     DependsOn: S3RoleforCiCd
     # this stack will not be created before the S3 stack
     Properties: 
-      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template
+      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template/jenk.yaml
       Parameters:
       # pass the variables to this stack
         KeyName: !Ref KeyPair
@@ -29,7 +29,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DependsOn: JenkinsInst
     Properties:
-      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template
+      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template/app01qa.yaml
       Parameters:
         KeyName: !Ref KeyPair
         MyIP: !Ref MyIP
@@ -38,7 +38,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DependsOn: JenkinsInst
     Properties:
-      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template
+      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template/nexus.yaml
       Parameters:
         KeyName: !Ref KeyPair
         MyIP: !Ref MyIP
@@ -47,7 +47,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DependsOn: JenkinsInst
     Properties:
-      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template
+      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template/sonar.yaml
       Parameters:
         KeyName: !Ref KeyPair
         MyIP: !Ref MyIP
@@ -56,7 +56,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DependsOn: App01qa
     Properties:
-      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template
+      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template/db01qa.yaml
       Parameters:
         KeyName: !Ref KeyPair
         MyIP: !Ref MyIP
@@ -65,7 +65,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DependsOn: JenkinsInst
     Properties:
-      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template
+      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template/wintest.yaml
       Parameters:
         KeyName: !Ref KeyPair
         MyIP: !Ref MyIP
