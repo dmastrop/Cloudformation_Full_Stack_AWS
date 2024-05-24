@@ -61,7 +61,7 @@ Resources:
             - - "Wintest in "
               - !Ref AWS::Region
       SecurityGroups:
-        - !Ref windtestSG
+        - !Ref wintestSG
       
       IamInstanceProfile:
         # this is from cicds3role.yaml
