@@ -2,6 +2,7 @@ Parameters:
   KeyPair:
     Description: cicd stack key
     Type: AWS::EC2::KeyPair::KeyName
+    # drop down list during stack creation
   MyIP:
     Description: Assigning IP
     Type: String
