@@ -70,14 +70,15 @@ Resources:
       SecurityGroups: 
         - !Ref vprodbSG
 
-      IamInstanceProfile:
+      # THIS IS NOT REQUIRED as there is no required S3 accss in UserData for db01qa
+      # IamInstanceProfile:
         # this is from cicds3role.yaml
-        Fn::ImportValue:
-          Fn::Sub: "${RoleTempName}-VPS3RoleProfileName"
-          # RoleTempName is specified in the Parameters and is the VPInstanceProfile data from cicds3role.yaml
-          # this is the exported variable VPS3RoleProfileName from cicds3role.yaml 
-          # This value will be stored in IamInstanceProfile and attached to this instance.
-          # This will give S3 full access so that the instance can download data from the S3 bucket (see below)
+        # Fn::ImportValue:
+        #   Fn::Sub: "${RoleTempName}-VPS3RoleProfileName"
+        #   # RoleTempName is specified in the Parameters and is the VPInstanceProfile data from cicds3role.yaml
+        #   # this is the exported variable VPS3RoleProfileName from cicds3role.yaml 
+        #   # This value will be stored in IamInstanceProfile and attached to this instance.
+        #   # This will give S3 full access so that the instance can download data from the S3 bucket (see below)
       
       # UserData:
       #   Fn::Base64:                                # YAML makes userdata much cleaner
