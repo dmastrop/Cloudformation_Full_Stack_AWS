@@ -43,14 +43,14 @@ Resources:
         KeyName: !Ref KeyPair
         MyIP: !Ref MyIP
 
-  # SonarServer:
-  #   Type: AWS::CloudFormation::Stack
-  #   DependsOn: JenkinsInst
-  #   Properties:
-  #     TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template/sonar.yaml
-  #     Parameters:
-  #       KeyName: !Ref KeyPair
-  #       MyIP: !Ref MyIP
+  SonarServer:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: JenkinsInst
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template/sonar.yaml
+      Parameters:
+        KeyName: !Ref KeyPair
+        MyIP: !Ref MyIP
 
   db01qa:
     Type: AWS::CloudFormation::Stack
