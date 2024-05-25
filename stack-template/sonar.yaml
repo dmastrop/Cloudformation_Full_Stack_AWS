@@ -209,7 +209,7 @@ Resources:
   sonarSG:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      GroupName: JenkinsSG
+      GroupName: sonarSG
       GroupDescription: Allow SSH & HTTP from  MyIP
       SecurityGroupIngress:
         - IpProtocol: tcp
