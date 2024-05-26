@@ -71,7 +71,7 @@ Resources:
           # This value will be stored in IamInstanceProfile and attached to this instance.
           # This will give S3 full access so that the instance can download data from the S3 bucket (see below)
       
-      Userdata:
+      UserData:
       # set up Jenkins on this EC2 instance
        Fn::Base64:  # YAML makes userdata much cleaner.
        # the original scripts no longer work. Upate the scripts with project 18 section 20 ansible project scripts.
