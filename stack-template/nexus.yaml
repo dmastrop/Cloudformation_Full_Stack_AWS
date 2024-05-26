@@ -82,7 +82,7 @@ Resources:
           # This value will be stored in IamInstanceProfile and attached to this instance.
           # This will give S3 full access so that the instance can download data from the S3 bucket (see below)
       
-      Userdata:
+      UserData:
       # set up Jenkins on this EC2 instance
        Fn::Base64:  # YAML makes userdata much cleaner.
       # UPDATED SCRIPT from project 18 Section 20
@@ -162,7 +162,7 @@ Resources:
             #  systemctl daemon-reload
             #  systemctl start nexus
             #  systemctl enable nexus
-            
+
             #  aws s3 cp s3://cicd-data-vprofile-project25/nexus-cicd-vpro-pro.tgz  /opt/
             #  cd /opt/
             #  sleep 5
