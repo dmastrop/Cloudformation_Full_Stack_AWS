@@ -71,41 +71,45 @@ Resources:
           # This value will be stored in IamInstanceProfile and attached to this instance.
           # This will give S3 full access so that the instance can download data from the S3 bucket (see below)
       
-      # Userdata:
-      # # set up Jenkins on this EC2 instance
-      #  Fn::Base64:  # YAML makes userdata much cleaner.
-      #   #  !Sub |
-      #   #      #!/bin/bash
-      #   #      sudo apt update
-      #   #      sudo apt install openjdk-8-jdk -y
-      #   #      sudo apt install maven git wget unzip -y
-      #   #      sudo apt install awscli -y
-      #   #      wget -q -O - https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo apt-key add -
-      #   #      sudo sh -c 'echo deb https://pkg.jenkins.io/debian-stable binary/ > /etc/apt/sources.list.d/jenkins.list'
-      #   #      sudo apt-get update
-      #   #      sudo apt-get install jenkins -y
-      #   #      sleep 10
-      #   #      systemctl stop jenkins
-      #   #      sleep 10
-      #   #      aws s3 cp s3://cicd-data-vprofile-project25/jenkins_cicdjobs.tar.gz /var/lib/
-      #   #      cd /var/lib/
-      #   #      tar xzvf jenkins_cicdjobs.tar.gz
-      #   #      chown jenkins.jenkins /var/lib/jenkins -R
-      #   #      reboot  
+      Userdata:
+      # set up Jenkins on this EC2 instance
+       Fn::Base64:  # YAML makes userdata much cleaner.
+       # the original scripts no longer work. Upate the scripts with project 18 section 20 ansible project scripts.
+         !Sub |
+            #!/bin/bash
+            sudo apt update
+            sudo apt install openjdk-11-jdk -y
+            sudo apt install maven wget unzip -y
 
-      #     !Sub |
-      #        #!/bin/bash
-      #        sudo apt update
-      #        sudo apt install openjdk-8-jdk -y
-      #        sudo apt install maven git wget unzip -y
-      #        sudo apt install awscli -y
-      #        wget -q -O - https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo apt-key add -
-      #        sudo sh -c 'echo deb https://pkg.jenkins.io/debian-stable binary/ > /etc/apt/sources.list.d/jenkins.list'
-      #        sudo apt-get update
-      #        sudo apt-get install jenkins -y
-      #        sleep 10
-      #        systemctl stop jenkins
-      #        reboot  
+            curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee \
+              /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+
+            echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+              https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+              /etc/apt/sources.list.d/jenkins.list > /dev/null
+
+            sudo apt-get update
+            sudo apt-get install jenkins -y
+
+          # ORIGINAL SCRIPT
+            #  #!/bin/bash
+            #  sudo apt update
+            #  sudo apt install openjdk-8-jdk -y
+            #  sudo apt install maven git wget unzip -y
+            #  sudo apt install awscli -y
+            #  wget -q -O - https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo apt-key add -
+            #  sudo sh -c 'echo deb https://pkg.jenkins.io/debian-stable binary/ > /etc/apt/sources.list.d/jenkins.list'
+            #  sudo apt-get update
+            #  sudo apt-get install jenkins -y
+            #  sleep 10
+            #  systemctl stop jenkins
+            #  sleep 10
+            
+            #  aws s3 cp s3://cicd-data-vprofile-project25/jenkins_cicdjobs.tar.gz /var/lib/
+            #  cd /var/lib/
+            #  tar xzvf jenkins_cicdjobs.tar.gz
+            #  chown jenkins.jenkins /var/lib/jenkins -R
+            #  reboot  
 
   # Second resource is the security group
   JenkinsSG:
