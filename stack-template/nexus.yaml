@@ -43,7 +43,7 @@ Parameters:
 #       AMI: "ami-0270524b69d8dc369"
 Mappings:
 #Try centos stream 9
-AmiRegionMap:
+  AmiRegionMap:
   #Logical ID of the mappings
     us-east-1: 
       AMI: "ami-0df2a11dd1fe1f8e3"
