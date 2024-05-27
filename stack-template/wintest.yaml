@@ -72,17 +72,17 @@ Resources:
           # This value will be stored in IamInstanceProfile and attached to this instance.
           # This will give S3 full access so that the instance can download data from the S3 bucket (see below)
 
-      # UserData:
-      #   Fn::Base64:                                # YAML makes userdata much cleaner. This is 
-      #     !Sub |
-      #         <powershell>
-      #         Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-      #         choco install jdk8 -y 
-      #         choco install maven -y 
-      #         choco install googlechrome -y
-      #         choco install git -y
-      #         mkdir C:\jenkins
-      #         </powershell>
+      UserData:
+        Fn::Base64:                                # YAML makes userdata much cleaner. This is 
+          !Sub |
+              <powershell>
+              Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+              choco install jdk8 -y 
+              choco install maven -y 
+              choco install googlechrome -y
+              choco install git -y
+              mkdir C:\jenkins
+              </powershell>
 
 
   wintestSG:
