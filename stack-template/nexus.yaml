@@ -103,7 +103,7 @@ Resources:
               sleep 5
               useradd nexus
               chown -R nexus.nexus /opt/nexus 
-              cat <<EOT> /etc/systemd/system/nexus.service
+              cat <<EOT>> /etc/systemd/system/nexus.service
               [Unit]                                                                          
               Description=nexus service                                                       
               After=network.target                                                            
