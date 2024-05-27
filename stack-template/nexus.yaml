@@ -101,7 +101,7 @@ Resources:
        Fn::Base64:  # YAML makes userdata much cleaner.
       # UPDATED SCRIPT from project 18 Section 20
          !Sub |
-             #!/bin/bash
+              #!/bin/bash
               yum install java-1.8.0-openjdk.x86_64 wget -y   
               mkdir -p /opt/nexus/   
               mkdir -p /tmp/nexus/                           
@@ -122,7 +122,7 @@ Resources:
               [Unit]                                                                          
               Description=nexus service                                                       
               After=network.target                                                            
-                                                                                
+
               [Service]                                                                       
               Type=forking                                                                    
               LimitNOFILE=65536                                                               
@@ -130,16 +130,16 @@ Resources:
               ExecStop=/opt/nexus/$NEXUSDIR/bin/nexus stop                                    
               User=nexus                                                                      
               Restart=on-abort                                                                
-                                                                                
+
               [Install]                                                                       
-              WantedBy=multi-user.target                                                      
+              WantedBy=multi-user.target    
               EOT
-              
+
+
               echo 'run_as_user="nexus"' > /opt/nexus/$NEXUSDIR/bin/nexus.rc
               systemctl daemon-reload
               systemctl start nexus
-              systemctl enable nexus
-
+              systemctl enable nexus  
             # ORIGINAL SCRIPT:
             #  #!/bin/bash
             #  yum install java-1.8.0-openjdk.x86_64 wget -y   
