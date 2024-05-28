@@ -214,7 +214,7 @@ Resources:
 
 
 
-              # For centos9 use rpm
+              # For centos9 use rpm and yum/dnf
               # https://www.rabbitmq.com/docs/install-rpm
 
               ## primary RabbitMQ signing key.  ADD sudo
@@ -224,11 +224,17 @@ Resources:
               ## RabbitMQ server repository
               sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key'
 
+              # In order to use the Yum repository, a .repo file (e.g. rabbitmq.repo) has to be added under the /etc/yum.repos.d/ directory. 
+              # The contents of the file will vary slightly between distributions (e.g. CentOS Stream 9, CentOS Stream 8).
+              
               # In /etc/yum.repos.d/rabbitmq.repo
 
               ##
               ## Zero dependency Erlang RPM
               ##
+
+
+              cat <<EOT>> /etc/yum.repos.d/rabbitmq.repo
               [modern-erlang]
               name=modern-erlang-el9
               # uses a Cloudsmith mirror @ yum.novemberain.com.
@@ -333,7 +339,9 @@ Resources:
               pkg_gpgcheck=1
               autorefresh=1
               type=rpm-md
+              EOT
               
+
               # add sudo
               sudo dnf update -y
               ## install these dependencies from standard OS repositories
