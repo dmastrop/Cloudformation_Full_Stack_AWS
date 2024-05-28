@@ -93,7 +93,7 @@ Resources:
               #aws s3 cp s3://cicd-data-vprofile-project25/tomcat-users.xml /usr/local/tomcat8/conf/tomcat-users.xml
               #aws s3 cp s3://cicd-data-vprofile-project25/context.xml /usr/local/tomcat8/webapps/manager/META-INF/context.xml
               
-              chown -R tomcat.tomcat /usr/local/tomcat8 
+              sudo chown -R tomcat.tomcat /usr/local/tomcat8 
               cat <<EOT>> /etc/systemd/system/tomcat.service
               [Unit]
               Description=Tomcat
