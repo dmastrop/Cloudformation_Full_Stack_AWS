@@ -108,6 +108,7 @@ Resources:
             #  sudo apt-get update
             #  sudo apt-get install jenkins -y
             #  sleep 10
+            
             #  systemctl stop jenkins
             #  sleep 10
 
