@@ -97,7 +97,7 @@ Resources:
           # This will give S3 full access so that the instance can download data from the S3 bucket (see below)
       
       UserData:
-      # set up Jenkins on this EC2 instance
+      # set up nexus on this EC2 instance. Section 20 project 18 script.
        Fn::Base64:  # YAML makes userdata much cleaner.
       # UPDATED SCRIPT from project 18 Section 20
          !Sub |
