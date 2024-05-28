@@ -34,6 +34,24 @@ Parameters:
     Default: t2.small
 
 
+
+Mappings:
+# CentOS 7 
+  AmiRegionMap:
+  #Logical ID of the mappings
+    us-east-1: 
+      AMI: "ami-0cdb8266fcd5d3d63"
+    us-west-1: 
+      AMI: "ami-0789ea4ecdab43447"
+    us-east-2: 
+      AMI: "ami-013f9ee48907190f5"
+    us-west-2: 
+      AMI: "ami-031e6a417aae9b9f6"
+    ap-northeast-1: 
+      AMI: "ami-0270524b69d8dc369"
+
+
+
 Mappings:
 # Need CentOS 7 or above. The AMIs below are CentOS stream 8
 # change to centos stream9 See below
@@ -211,6 +229,9 @@ Resources:
 
               # ## Install rabbitmq-server and its dependencies
               # sudo apt-get install rabbitmq-server -y --fix-missing
+
+
+
 
 
 
@@ -497,22 +518,25 @@ Resources:
 
 
 
-              ### Try this (this is for centos7):
-              curl -s https://packagecloud.io/install/repositories/rabbitmq/erlang/script.rpm.sh | sudo bash
-              sudo yum clean all
-              sudo yum makecache
-              sudo yum install erlang -y
-              curl -s https://packagecloud.io/install/repositories/rabbitmq/rabbitmq-server/script.rpm.sh | sudo bash
-              sudo yum install rabbitmq-server -y
-              rpm -qi rabbitmq-server
-              systemctl start rabbitmq-server
-              sudo systemctl enable rabbitmq-server
-              sudo systemctl status rabbitmq-server
 
-              echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
-              rabbitmqctl add_user test test
-              rabbitmqctl set_user_tags test administrator
-              systemctl restart rabbitmq-server
+
+
+              # ### Try this (this is for centos7):
+              # curl -s https://packagecloud.io/install/repositories/rabbitmq/erlang/script.rpm.sh | sudo bash
+              # sudo yum clean all
+              # sudo yum makecache
+              # sudo yum install erlang -y
+              # curl -s https://packagecloud.io/install/repositories/rabbitmq/rabbitmq-server/script.rpm.sh | sudo bash
+              # sudo yum install rabbitmq-server -y
+              # rpm -qi rabbitmq-server
+              # systemctl start rabbitmq-server
+              # sudo systemctl enable rabbitmq-server
+              # sudo systemctl status rabbitmq-server
+
+              # echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
+              # rabbitmqctl add_user test test
+              # rabbitmqctl set_user_tags test administrator
+              # systemctl restart rabbitmq-server
 
 
   vprodbSG:
