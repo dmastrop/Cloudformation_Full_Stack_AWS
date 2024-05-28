@@ -217,12 +217,12 @@ Resources:
               # For centos9 use rpm
               # https://www.rabbitmq.com/docs/install-rpm
 
-              ## primary RabbitMQ signing key
-              rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc'
+              ## primary RabbitMQ signing key.  ADD sudo
+              sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc'
               ## modern Erlang repository
-              rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key'
+              sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key'
               ## RabbitMQ server repository
-              rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key'
+              sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key'
 
               # In /etc/yum.repos.d/rabbitmq.repo
 
@@ -334,11 +334,12 @@ Resources:
               autorefresh=1
               type=rpm-md
               
-              dnf update -y
+              # add sudo
+              sudo dnf update -y
               ## install these dependencies from standard OS repositories
-              dnf install socat logrotate -y
+              sudo dnf install socat logrotate -y
               ## install RabbitMQ and zero dependency Erlang
-              dnf install -y erlang rabbitmq-server
+              sudo dnf install -y erlang rabbitmq-server
 
 
 
