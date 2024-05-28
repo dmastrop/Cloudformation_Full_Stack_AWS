@@ -82,13 +82,17 @@ Resources:
               sudo apt install awscli -y
               TOMURL="https://archive.apache.org/dist/tomcat/tomcat-8/v8.5.37/bin/apache-tomcat-8.5.37.tar.gz"
               cd /tmp/
-              wget $TOMURL -O tomcatbin.tar.gz
+              # add sudo
+              sudo wget $TOMURL -O tomcatbin.tar.gz
               EXTOUT=`tar xzvf tomcatbin.tar.gz`
               TOMDIR=`echo $EXTOUT | cut -d '/' -f1`
-              useradd --shell /sbin/nologin tomcat
-              rsync -avzh /tmp/$TOMDIR/ /usr/local/tomcat8/
-              aws s3 cp s3://cicd-data-vprofile-project25/tomcat-users.xml /usr/local/tomcat8/conf/tomcat-users.xml
-              aws s3 cp s3://cicd-data-vprofile-project25/context.xml /usr/local/tomcat8/webapps/manager/META-INF/context.xml
+              # add sudo
+              sudo useradd --shell /sbin/nologin tomcat
+              sudo rsync -avzh /tmp/$TOMDIR/ /usr/local/tomcat8/
+
+              #aws s3 cp s3://cicd-data-vprofile-project25/tomcat-users.xml /usr/local/tomcat8/conf/tomcat-users.xml
+              #aws s3 cp s3://cicd-data-vprofile-project25/context.xml /usr/local/tomcat8/webapps/manager/META-INF/context.xml
+              
               chown -R tomcat.tomcat /usr/local/tomcat8 
               cat <<EOT>> /etc/systemd/system/tomcat.service
               [Unit]
