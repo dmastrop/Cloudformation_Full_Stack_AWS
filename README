@@ -4,3 +4,484 @@
 # Overview of project 25 (main branch)
 
 Project25: Full stack CI/CD impementation using Cloudformation. tomcat, mysql, memcached, rabbitmq with Jenkins, Sonarqube and Nexus
+
+
+updaed UserData scripts are below
+The S3 restoration bucket code has been removed but can be added back in once the restoraton files are ready
+
+## Jenkins
+
+UserData:
+      # set up Jenkins on this EC2 instance
+       Fn::Base64:  # YAML makes userdata much cleaner.
+       # the original scripts no longer work. Upate the scripts with project 18 section 20 ansible project scripts.
+         !Sub |
+            #!/bin/bash
+            sudo apt update
+            sudo apt install openjdk-11-jdk -y
+            sudo apt install maven wget unzip -y
+
+            curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+
+            echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/ | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+
+            sudo apt-get update
+            sudo apt-get install jenkins -y
+
+
+## Nexus
+
+UserData:
+      # set up nexus on this EC2 instance. Section 20 project 18 script.
+       Fn::Base64:  # YAML makes userdata much cleaner.
+      # UPDATED SCRIPT from project 18 Section 20
+         !Sub |
+              #!/bin/bash
+              yum install java-1.8.0-openjdk.x86_64 wget -y   
+              mkdir -p /opt/nexus/   
+              mkdir -p /tmp/nexus/                           
+              cd /tmp/nexus/
+              NEXUSURL="https://download.sonatype.com/nexus/3/latest-unix.tar.gz"
+              wget $NEXUSURL -O nexus.tar.gz
+              sleep 10
+              EXTOUT=`tar xzvf nexus.tar.gz`
+              NEXUSDIR=`echo $EXTOUT | cut -d '/' -f1`
+              sleep 5
+              rm -rf /tmp/nexus/nexus.tar.gz
+              cp -r /tmp/nexus/* /opt/nexus/
+              sleep 5
+              useradd nexus
+              chown -R nexus.nexus /opt/nexus 
+              sudo -i
+              cat <<EOT>> /etc/systemd/system/nexus.service
+              [Unit]                                                                          
+              Description=nexus service                                                       
+              After=network.target                                                            
+
+              [Service]                                                                       
+              Type=forking                                                                    
+              LimitNOFILE=65536                                                               
+              ExecStart=/opt/nexus/$NEXUSDIR/bin/nexus start                                  
+              ExecStop=/opt/nexus/$NEXUSDIR/bin/nexus stop                                    
+              User=nexus                                                                      
+              Restart=on-abort                                                                
+
+              [Install]                                                                       
+              WantedBy=multi-user.target    
+              EOT
+
+
+              echo 'run_as_user="nexus"' > /opt/nexus/$NEXUSDIR/bin/nexus.rc
+              systemctl daemon-reload
+              systemctl start nexus
+              systemctl enable nexus 
+
+
+## Sonarqube:
+
+UserData:
+      # set up sonarqube on this EC2 instance. Project 18 section 20 script
+       Fn::Base64:  # YAML makes userdata much cleaner.
+         !Sub |
+                #!/bin/bash
+                cp /etc/sysctl.conf /root/sysctl.conf_backup
+                cat <<EOT> /etc/sysctl.conf
+                vm.max_map_count=262144
+                fs.file-max=65536
+                ulimit -n 65536
+                ulimit -u 4096
+                EOT
+                cp /etc/security/limits.conf /root/sec_limit.conf_backup
+                cat <<EOT> /etc/security/limits.conf
+                sonarqube   -   nofile   65536
+                sonarqube   -   nproc    409
+                EOT
+
+                sudo apt-get update -y
+                sudo apt-get install openjdk-11-jdk -y
+                sudo update-alternatives --config java
+
+                java -version
+
+                sudo apt update
+                wget -q https://www.postgresql.org/media/keys/ACCC4CF8.asc -O - | sudo apt-key add -
+
+                sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" >> /etc/apt/sources.list.d/pgdg.list'
+
+
+                sudo apt install postgresql postgresql-contrib -y
+                #sudo -u postgres psql -c "SELECT version();"
+                sudo systemctl enable postgresql.service
+                sudo systemctl start  postgresql.service
+                sudo echo "postgres:admin123" | chpasswd
+                runuser -l postgres -c "createuser sonar"
+                sudo -i -u postgres psql -c "ALTER USER sonar WITH ENCRYPTED PASSWORD 'admin123';"
+                sudo -i -u postgres psql -c "CREATE DATABASE sonarqube OWNER sonar;"
+                sudo -i -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE sonarqube to sonar;"
+                systemctl restart  postgresql
+                #systemctl status -l   postgresql
+                apt install net-tools   
+                netstat -tulpena | grep postgres
+                sudo mkdir -p /sonarqube/
+                cd /sonarqube/
+                sudo curl -O https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-8.3.0.34182.zip
+
+
+                sudo apt-get install zip -y
+                sudo unzip -o sonarqube-8.3.0.34182.zip -d /opt/
+                sudo mv /opt/sonarqube-8.3.0.34182/ /opt/sonarqube
+                sudo groupadd sonar
+                sudo useradd -c "SonarQube - User" -d /opt/sonarqube/ -g sonar sonar
+                sudo chown sonar:sonar /opt/sonarqube/ -R
+                cp /opt/sonarqube/conf/sonar.properties /root/sonar.properties_backup
+                cat <<EOT> /opt/sonarqube/conf/sonar.properties
+                sonar.jdbc.username=sonar
+                sonar.jdbc.password=admin123
+                sonar.jdbc.url=jdbc:postgresql://localhost/sonarqube
+                sonar.web.host=0.0.0.0
+                sonar.web.port=9000
+                sonar.web.javaAdditionalOpts=-server
+                sonar.search.javaOpts=-Xmx512m -Xms512m -XX:+HeapDumpOnOutOfMemoryError
+                sonar.log.level=INFO
+                sonar.path.logs=logs
+                EOT
+
+                cat <<EOT> /etc/systemd/system/sonarqube.service
+                [Unit]
+                Description=SonarQube service
+                After=syslog.target network.target
+
+                [Service]
+                Type=forking
+
+                ExecStart=/opt/sonarqube/bin/linux-x86-64/sonar.sh start
+                ExecStop=/opt/sonarqube/bin/linux-x86-64/sonar.sh stop
+
+                User=sonar
+                Group=sonar
+                Restart=always
+
+                LimitNOFILE=65536
+                LimitNPROC=4096
+
+                [Install]
+                WantedBy=multi-user.target
+                EOT
+
+                systemctl daemon-reload
+                systemctl enable sonarqube.service
+                #systemctl start sonarqube.service
+                #systemctl status -l sonarqube.service
+                apt-get install nginx -y
+                rm -rf /etc/nginx/sites-enabled/default
+                rm -rf /etc/nginx/sites-available/default
+                cat <<EOT> /etc/nginx/sites-available/sonarqube
+                server{
+                    listen      80;
+                    server_name sonarqube.groophy.in;
+
+                    access_log  /var/log/nginx/sonar.access.log;
+                    error_log   /var/log/nginx/sonar.error.log;
+
+                    proxy_buffers 16 64k;
+                    proxy_buffer_size 128k;
+
+                    location / {
+                        proxy_pass  http://127.0.0.1:9000;
+                        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+                        proxy_redirect off;
+
+                        proxy_set_header    Host            \$host;
+                        proxy_set_header    X-Real-IP       \$remote_addr;
+                        proxy_set_header    X-Forwarded-For \$proxy_add_x_forwarded_for;
+                        proxy_set_header    X-Forwarded-Proto http;
+                    }
+                }
+                EOT
+                ln -s /etc/nginx/sites-available/sonarqube /etc/nginx/sites-enabled/sonarqube
+                systemctl enable nginx.service
+                #systemctl restart nginx.service
+                sudo ufw allow 80,9000,9001/tcp
+
+                echo "System reboot in 30 sec"
+                sleep 30
+                reboot
+
+
+## Windows
+
+      UserData:
+        Fn::Base64:                                # YAML makes userdata much cleaner. This is 
+          !Sub |
+              <powershell>
+              Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+              choco install jdk8 -y 
+              choco install maven -y 
+              choco install googlechrome -y
+              choco install git -y
+              mkdir C:\jenkins
+              </powershell>
+
+
+## app01 server (tomcat8)
+
+UserData:
+        Fn::Base64:                                # YAML makes userdata much cleaner
+          !Sub |
+              #!/bin/bash
+              sudo apt update
+              sudo apt install openjdk-8-jdk -y
+              sudo apt install git wget unzip -y
+              sudo apt install awscli -y
+              TOMURL="https://archive.apache.org/dist/tomcat/tomcat-8/v8.5.37/bin/apache-tomcat-8.5.37.tar.gz"
+              cd /tmp/
+              # add sudo
+              sudo wget $TOMURL -O tomcatbin.tar.gz
+              EXTOUT=`tar xzvf tomcatbin.tar.gz`
+              TOMDIR=`echo $EXTOUT | cut -d '/' -f1`
+              # add sudo
+              sudo useradd --shell /sbin/nologin tomcat
+              sudo rsync -avzh /tmp/$TOMDIR/ /usr/local/tomcat8/
+
+              #aws s3 cp s3://cicd-data-vprofile-project25/tomcat-users.xml /usr/local/tomcat8/conf/tomcat-users.xml
+              #aws s3 cp s3://cicd-data-vprofile-project25/context.xml /usr/local/tomcat8/webapps/manager/META-INF/context.xml
+              
+              sudo chown -R tomcat.tomcat /usr/local/tomcat8 
+              cat <<EOT>> /etc/systemd/system/tomcat.service
+              [Unit]
+              Description=Tomcat
+              After=network.target
+
+              [Service]
+              User=tomcat
+              WorkingDirectory=/usr/local/tomcat8
+              Environment=CATALINA_HOME=/usr/local/tomcat8
+              Environment=CATALINE_BASE=/usr/local/tomcat8
+              ExecStart=/usr/local/tomcat8/bin/catalina.sh run
+              ExecStop=/usr/local/tomcat8/bin/shutdown.sh
+              SyslogIdentifier=tomcat-%i
+
+              [Install]
+              WantedBy=multi-user.target
+              EOT
+
+              systemctl daemon-reload
+              systemctl start tomcat
+              systemctl enable tomcat
+
+
+## db01qa.yaml (mysql, memcached, and rabbitmq)
+
+UserData:
+        Fn::Base64:                                # YAML makes userdata much cleaner
+          !Sub |
+              #!/bin/bash
+              DATABASE_PASS='admin123'
+              yum update -y
+              yum install epel-release -y
+              yum install mariadb-server -y
+              yum install wget git unzip -y
+
+              #mysql_secure_installation
+              sed -i 's/^127.0.0.1/0.0.0.0/' /etc/my.cnf
+
+              # starting & enabling mariadb-server
+              systemctl start mariadb
+              systemctl enable mariadb
+
+              #restore the dump file for the application
+              cd /tmp/
+              wget https://raw.githubusercontent.com/devopshydclub/vprofile-repo/vp-rem/src/main/resources/db_backup.sql
+              mysqladmin -u root password "$DATABASE_PASS"
+              mysql -u root -p"$DATABASE_PASS" -e "UPDATE mysql.user SET Password=PASSWORD('$DATABASE_PASS') WHERE User='root'"
+              mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
+              mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.user WHERE User=''"
+              mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%'"
+              mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES"
+              mysql -u root -p"$DATABASE_PASS" -e "create database accounts"
+              mysql -u root -p"$DATABASE_PASS" -e "grant all privileges on accounts.* TO 'admin'@'localhost' identified by 'admin123'"
+              mysql -u root -p"$DATABASE_PASS" -e "grant all privileges on accounts.* TO 'admin'@'%' identified by 'admin123'"
+              mysql -u root -p"$DATABASE_PASS" accounts < /tmp/db_backup.sql
+              mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES"
+
+              # Restart mariadb-server
+              systemctl restart mariadb
+
+
+
+              # SETUP MEMCACHE
+              yum install memcached -y
+              systemctl start memcached
+              systemctl enable memcached
+              systemctl status memcached
+              memcached -p 11211 -U 11111 -u memcached -d
+              sleep 30
+
+
+
+              # SETUP RABBITMQ
+              yum install socat -y
+              yum install wget -y
+
+
+            # For centos 8 and 9 use rpm and yum/dnf
+              # https://www.rabbitmq.com/docs/install-rpm
+              # RabbitMQ RPM package will require sudo privileges to install and manage. 
+
+              ## primary RabbitMQ signing key.  ADD sudo
+              sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc'
+              ## modern Erlang repository
+              sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key'
+              ## RabbitMQ server repository
+              sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key'
+
+              # In order to use the Yum repository, a .repo file (e.g. rabbitmq.repo) has to be added under the /etc/yum.repos.d/ directory. 
+              # The contents of the file will vary slightly between distributions (e.g. CentOS Stream 9, CentOS Stream 8).
+
+              ###### Centos8.  
+              # The repo for Centos9 is not working. Try ami for centos8 (modern-erlang-el8)
+              # modern-erlang-el9  Error: Failed to download metadata for repo 'modern-erlang': Cannot download repomd.xml: 
+              # Cannot download repodata/repomd.xml: All mirrors were tried
+              # Change AMI from centos9 to 8
+
+              sudo cat <<EOT>> /etc/yum.repos.d/rabbitmq.repo
+              # In /etc/yum.repos.d/rabbitmq.repo
+
+              ##
+              ## Zero dependency Erlang RPM
+              ##
+
+              [modern-erlang]
+              name=modern-erlang-el8
+              # uses a Cloudsmith mirror @ yum.novemberain.com in addition to its Cloudsmith upstream.
+              # Unlike Cloudsmith, the mirror does not have any traffic quotas
+              baseurl=https://yum1.novemberain.com/erlang/el/8/$basearch
+                      https://yum2.novemberain.com/erlang/el/8/$basearch
+                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/8/$basearch
+              repo_gpgcheck=1
+              enabled=1
+              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
+              gpgcheck=1
+              sslverify=1
+              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              metadata_expire=300
+              pkg_gpgcheck=1
+              autorefresh=1
+              type=rpm-md
+
+              [modern-erlang-noarch]
+              name=modern-erlang-el8-noarch
+              # uses a Cloudsmith mirror @ yum.novemberain.com.
+              # Unlike Cloudsmith, it does not have any traffic quotas
+              baseurl=https://yum1.novemberain.com/erlang/el/8/noarch
+                      https://yum2.novemberain.com/erlang/el/8/noarch
+                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/8/noarch
+              repo_gpgcheck=1
+              enabled=1
+              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
+                     https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+              gpgcheck=1
+              sslverify=1
+              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              metadata_expire=300
+              pkg_gpgcheck=1
+              autorefresh=1
+              type=rpm-md
+
+              [modern-erlang-source]
+              name=modern-erlang-el8-source
+              # uses a Cloudsmith mirror @ yum.novemberain.com.
+              # Unlike Cloudsmith, it does not have any traffic quotas
+              baseurl=https://yum1.novemberain.com/erlang/el/8/SRPMS
+                      https://yum2.novemberain.com/erlang/el/8/SRPMS
+                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/8/SRPMS
+              repo_gpgcheck=1
+              enabled=1
+              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
+                     https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+              gpgcheck=1
+              sslverify=1
+              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              metadata_expire=300
+              pkg_gpgcheck=1
+              autorefresh=1
+
+
+              ##
+              ## RabbitMQ Server
+              ##
+
+              [rabbitmq-el8]
+              name=rabbitmq-el8
+              baseurl=https://yum2.novemberain.com/rabbitmq/el/8/$basearch
+                      https://yum1.novemberain.com/rabbitmq/el/8/$basearch
+                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/8/$basearch
+              repo_gpgcheck=1
+              enabled=1
+              # Cloudsmith's repository key and RabbitMQ package signing key
+              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
+                     https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+              gpgcheck=1
+              sslverify=1
+              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              metadata_expire=300
+              pkg_gpgcheck=1
+              autorefresh=1
+              type=rpm-md
+
+              [rabbitmq-el8-noarch]
+              name=rabbitmq-el8-noarch
+              baseurl=https://yum2.novemberain.com/rabbitmq/el/8/noarch
+                      https://yum1.novemberain.com/rabbitmq/el/8/noarch
+                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/8/noarch
+              repo_gpgcheck=1
+              enabled=1
+              # Cloudsmith's repository key and RabbitMQ package signing key
+              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
+                     https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+              gpgcheck=1
+              sslverify=1
+              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              metadata_expire=300
+              pkg_gpgcheck=1
+              autorefresh=1
+              type=rpm-md
+
+              [rabbitmq-el8-source]
+              name=rabbitmq-el8-source
+              baseurl=https://yum2.novemberain.com/rabbitmq/el/8/SRPMS
+                      https://yum1.novemberain.com/rabbitmq/el/8/SRPMS
+                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/8/SRPMS
+              repo_gpgcheck=1
+              enabled=1
+              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
+              gpgcheck=0
+              sslverify=1
+              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              metadata_expire=300
+              pkg_gpgcheck=1
+              autorefresh=1
+              type=rpm-md
+              EOT
+
+
+              # add sudo
+              sudo dnf update -y
+              ## install these dependencies from standard OS repositories
+              sudo dnf install socat logrotate -y
+              ## install RabbitMQ and zero dependency Erlang
+              sudo dnf install -y erlang rabbitmq-server
+
+
+
+
+              systemctl start rabbitmq-server
+              systemctl enable rabbitmq-server
+              systemctl status rabbitmq-server
+              echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
+              rabbitmqctl add_user test test
+              rabbitmqctl set_user_tags test administrator
+              systemctl restart rabbitmq-server
+
+
+
