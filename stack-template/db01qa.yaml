@@ -34,20 +34,37 @@ Parameters:
     Default: t2.small
 
 
+# Mappings:
+# # Need CentOS 7 or above. The AMIs below are CentOS stream 8
+# # change to centos stream9 See below
+#   AmiRegionMap:
+#   #Logical ID of the mappings
+#     us-east-1: 
+#       AMI: "ami-0cdb8266fcd5d3d63"
+#     us-west-1: 
+#       AMI: "ami-0789ea4ecdab43447"
+#     us-east-2: 
+#       AMI: "ami-013f9ee48907190f5"
+#     us-west-2: 
+#       AMI: "ami-031e6a417aae9b9f6"
+#     ap-northeast-1: 
+#       AMI: "ami-0270524b69d8dc369"
+
 Mappings:
-# Need CentOS 7 or above. The AMIs below are CentOS stream 8
+#Try centos stream 9
   AmiRegionMap:
   #Logical ID of the mappings
     us-east-1: 
-      AMI: "ami-0cdb8266fcd5d3d63"
+      AMI: "ami-0df2a11dd1fe1f8e3"
     us-west-1: 
-      AMI: "ami-0789ea4ecdab43447"
+      AMI: "ami-084c852d3275c2e20"
     us-east-2: 
-      AMI: "ami-013f9ee48907190f5"
+      AMI: "ami-011d59a275b482a49"
     us-west-2: 
-      AMI: "ami-031e6a417aae9b9f6"
+      AMI: "ami-094cc0ced7b91fcf0"
     ap-northeast-1: 
-      AMI: "ami-0270524b69d8dc369"
+      AMI: "ami-074c801439a538a43"
+
 
 
 Resources:
