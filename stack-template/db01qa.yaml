@@ -163,49 +163,185 @@ Resources:
               # rabbitmqctl set_user_tags test administrator
               # systemctl restart rabbitmq-server
 
+
+
+
               # Use project 23 Section 25 updated scripts to install RabbitMQ
+              # https://www.rabbitmq.com/docs/install-debian
+              # this is for debian and not for centos stream 8 or 9
 
-              sudo apt-get install curl gnupg apt-transport-https -y
-              ## Team RabbitMQ's main signing key
-              curl -1sLf "https://keys.openpgp.org/vks/v1/by-fingerprint/0A9AF2115F4687BD29803A206B73A36E6026DFCA" | sudo gpg --dearmor | sudo tee /usr/share/keyrings/com.rabbitmq.team.gpg > /dev/null
-              ## Community mirror of Cloudsmith: modern Erlang repository
-              curl -1sLf https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key | sudo gpg --dearmor | sudo tee /usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg > /dev/null
-              ## Community mirror of Cloudsmith: RabbitMQ repository
-              curl -1sLf https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key | sudo gpg --dearmor | sudo tee /usr/share/keyrings/rabbitmq.9F4587F226208342.gpg > /dev/null
+              # sudo apt-get install curl gnupg apt-transport-https -y
+              # ## Team RabbitMQ's main signing key
+              # curl -1sLf "https://keys.openpgp.org/vks/v1/by-fingerprint/0A9AF2115F4687BD29803A206B73A36E6026DFCA" | sudo gpg --dearmor | sudo tee /usr/share/keyrings/com.rabbitmq.team.gpg > /dev/null
+              # ## Community mirror of Cloudsmith: modern Erlang repository
+              # curl -1sLf https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key | sudo gpg --dearmor | sudo tee /usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg > /dev/null
+              # ## Community mirror of Cloudsmith: RabbitMQ repository
+              # curl -1sLf https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key | sudo gpg --dearmor | sudo tee /usr/share/keyrings/rabbitmq.9F4587F226208342.gpg > /dev/null
 
-              ## Add apt repositories maintained by Team RabbitMQ
-              sudo tee /etc/apt/sources.list.d/rabbitmq.list <<EOF
-              ## Provides modern Erlang/OTP releases
+              # ## Add apt repositories maintained by Team RabbitMQ
+              # sudo tee /etc/apt/sources.list.d/rabbitmq.list <<EOF
+              # ## Provides modern Erlang/OTP releases
+              # ##
+              # deb [signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa1.novemberain.com/rabbitmq/rabbitmq-erlang/deb/ubuntu jammy main
+              # deb-src [signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa1.novemberain.com/rabbitmq/rabbitmq-erlang/deb/ubuntu jammy main
+
+              # # another mirror for redundancy
+              # deb [signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa2.novemberain.com/rabbitmq/rabbitmq-erlang/deb/ubuntu jammy main
+              # deb-src [signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa2.novemberain.com/rabbitmq/rabbitmq-erlang/deb/ubuntu jammy main
+
+              # ## Provides RabbitMQ
+              # ##
+              # deb [signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa1.novemberain.com/rabbitmq/rabbitmq-server/deb/ubuntu jammy main
+              # deb-src [signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa1.novemberain.com/rabbitmq/rabbitmq-server/deb/ubuntu jammy main
+
+              # # another mirror for redundancy
+              # deb [signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa2.novemberain.com/rabbitmq/rabbitmq-server/deb/ubuntu jammy main
+              # deb-src [signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa2.novemberain.com/rabbitmq/rabbitmq-server/deb/ubuntu jammy main
+              # EOF
+
+              # ## Update package indices
+              # sudo apt-get update -y
+
+              # ## Install Erlang packages
+              # sudo apt-get install -y erlang-base \
+              #                         erlang-asn1 erlang-crypto erlang-eldap erlang-ftp erlang-inets \
+              #                         erlang-mnesia erlang-os-mon erlang-parsetools erlang-public-key \
+              #                         erlang-runtime-tools erlang-snmp erlang-ssl \
+              #                         erlang-syntax-tools erlang-tftp erlang-tools erlang-xmerl
+
+              # ## Install rabbitmq-server and its dependencies
+              # sudo apt-get install rabbitmq-server -y --fix-missing
+
+
+
+              # For centos9 use rpm
+              # https://www.rabbitmq.com/docs/install-rpm
+
+              ## primary RabbitMQ signing key
+              rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc'
+              ## modern Erlang repository
+              rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key'
+              ## RabbitMQ server repository
+              rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key'
+
+              # In /etc/yum.repos.d/rabbitmq.repo
+
               ##
-              deb [signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa1.novemberain.com/rabbitmq/rabbitmq-erlang/deb/ubuntu jammy main
-              deb-src [signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa1.novemberain.com/rabbitmq/rabbitmq-erlang/deb/ubuntu jammy main
-
-              # another mirror for redundancy
-              deb [signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa2.novemberain.com/rabbitmq/rabbitmq-erlang/deb/ubuntu jammy main
-              deb-src [signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa2.novemberain.com/rabbitmq/rabbitmq-erlang/deb/ubuntu jammy main
-
-              ## Provides RabbitMQ
+              ## Zero dependency Erlang RPM
               ##
-              deb [signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa1.novemberain.com/rabbitmq/rabbitmq-server/deb/ubuntu jammy main
-              deb-src [signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa1.novemberain.com/rabbitmq/rabbitmq-server/deb/ubuntu jammy main
+              [modern-erlang]
+              name=modern-erlang-el9
+              # uses a Cloudsmith mirror @ yum.novemberain.com.
+              # Unlike Cloudsmith, it does not have any traffic quotas
+              baseurl=https://yum1.novemberain.com/erlang/el/9/$basearch
+                      https://yum2.novemberain.com/erlang/el/9/$basearch
+                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/9/$basearch
+              repo_gpgcheck=1
+              enabled=1
+              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
+              gpgcheck=1
+              sslverify=1
+              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              metadata_expire=300
+              pkg_gpgcheck=1
+              autorefresh=1
+              type=rpm-md
+              [modern-erlang-noarch]
+              name=modern-erlang-el9-noarch
+              # uses a Cloudsmith mirror @ yum.novemberain.com.
+              # Unlike Cloudsmith, it does not have any traffic quotas
+              baseurl=https://yum1.novemberain.com/erlang/el/9/noarch
+                      https://yum2.novemberain.com/erlang/el/9/noarch
+                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/9/noarch
+              repo_gpgcheck=1
+              enabled=1
+              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
+                     https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+              gpgcheck=1
+              sslverify=1
+              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              metadata_expire=300
+              pkg_gpgcheck=1
+              autorefresh=1
+              type=rpm-md
+              [modern-erlang-source]
+              name=modern-erlang-el9-source
+              # uses a Cloudsmith mirror @ yum.novemberain.com.
+              # Unlike Cloudsmith, it does not have any traffic quotas
+              baseurl=https://yum1.novemberain.com/erlang/el/9/SRPMS
+                      https://yum2.novemberain.com/erlang/el/9/SRPMS
+                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/9/SRPMS
+              repo_gpgcheck=1
+              enabled=1
+              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
+                     https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+              gpgcheck=1
+              sslverify=1
+              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              metadata_expire=300
+              pkg_gpgcheck=1
+              autorefresh=1
+              ##
+              ## RabbitMQ Server
+              ##
+              [rabbitmq-el9]
+              name=rabbitmq-el9
+              baseurl=https://yum2.novemberain.com/rabbitmq/el/9/$basearch
+                      https://yum1.novemberain.com/rabbitmq/el/9/$basearch
+                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/9/$basearch
+              repo_gpgcheck=1
+              enabled=1
+              # Cloudsmith's repository key and RabbitMQ package signing key
+              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
+                     https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+              gpgcheck=1
+              sslverify=1
+              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              metadata_expire=300
+              pkg_gpgcheck=1
+              autorefresh=1
+              type=rpm-md
+              [rabbitmq-el9-noarch]
+              name=rabbitmq-el9-noarch
+              baseurl=https://yum2.novemberain.com/rabbitmq/el/9/noarch
+                      https://yum1.novemberain.com/rabbitmq/el/9/noarch
+                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/9/noarch
+              repo_gpgcheck=1
+              enabled=1
+              # Cloudsmith's repository key and RabbitMQ package signing key
+              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
+                     https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+              gpgcheck=1
+              sslverify=1
+              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              metadata_expire=300
+              pkg_gpgcheck=1
+              autorefresh=1
+              type=rpm-md
+              [rabbitmq-el9-source]
+              name=rabbitmq-el9-source
+              baseurl=https://yum2.novemberain.com/rabbitmq/el/9/SRPMS
+                      https://yum1.novemberain.com/rabbitmq/el/9/SRPMS
+                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/9/SRPMS
+              repo_gpgcheck=1
+              enabled=1
+              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
+              gpgcheck=0
+              sslverify=1
+              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              metadata_expire=300
+              pkg_gpgcheck=1
+              autorefresh=1
+              type=rpm-md
+              
+              dnf update -y
+              ## install these dependencies from standard OS repositories
+              dnf install socat logrotate -y
+              ## install RabbitMQ and zero dependency Erlang
+              dnf install -y erlang rabbitmq-server
 
-              # another mirror for redundancy
-              deb [signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa2.novemberain.com/rabbitmq/rabbitmq-server/deb/ubuntu jammy main
-              deb-src [signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa2.novemberain.com/rabbitmq/rabbitmq-server/deb/ubuntu jammy main
-              EOF
 
-              ## Update package indices
-              sudo apt-get update -y
 
-              ## Install Erlang packages
-              sudo apt-get install -y erlang-base \
-                                      erlang-asn1 erlang-crypto erlang-eldap erlang-ftp erlang-inets \
-                                      erlang-mnesia erlang-os-mon erlang-parsetools erlang-public-key \
-                                      erlang-runtime-tools erlang-snmp erlang-ssl \
-                                      erlang-syntax-tools erlang-tftp erlang-tools erlang-xmerl
-
-              ## Install rabbitmq-server and its dependencies
-              sudo apt-get install rabbitmq-server -y --fix-missing
 
               systemctl start rabbitmq-server
               systemctl enable rabbitmq-server
