@@ -216,6 +216,7 @@ Resources:
 
               # For centos9 use rpm and yum/dnf
               # https://www.rabbitmq.com/docs/install-rpm
+              # RabbitMQ RPM package will require sudo privileges to install and manage. 
 
               ## primary RabbitMQ signing key.  ADD sudo
               sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc'
@@ -234,7 +235,7 @@ Resources:
               ##
 
 
-              cat <<EOT>> /etc/yum.repos.d/rabbitmq.repo
+              sudo cat <<EOT>> /etc/yum.repos.d/rabbitmq.repo
               [modern-erlang]
               name=modern-erlang-el9
               # uses a Cloudsmith mirror @ yum.novemberain.com.
