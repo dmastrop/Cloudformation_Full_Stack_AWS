@@ -1,0 +1,590 @@
+# This provisions the mysql db and the memcached and the rabbitmq services
+
+Parameters:
+  appStackName:
+    Description: Name of the base stack with all infra resources
+    Type: String
+    Default: app01qa
+
+  # RoleTempName:
+  #   Description: Name of the base stack with all infra resources
+  #   Type: String
+  #   Default: cicds3role
+  #   # this is the name of the template and we are getting the export from the cicds3role.yaml which is
+  #   # cicds3role-VPS3RoleProfileName variable. The data will be !Ref VPInstanceProfile of that template file.
+  #   # this is used in NexusInst resource below
+
+  # JenkStackName:
+  #   Description: Name of the base stack with all infra resources
+  #   Type: String
+  #   Default: jenk
+  #   # This is the name of the tempalte jenk.yaml and we are getting the export from the template
+  #   # The exported data is jenk-SGID forvpronexusSBIngress below to append the additonal rule to the nexusSG
+  #   # that permits Jenkins to access Nexus server to upload the artfact from Nexus.
+
+  # The root (master) template is sending 2 parameters to this child template: MyIP and KeyName
+  MyIP:
+    Type: String
+  KeyName:
+    Type: String
+
+  # Fourth parameter is InstanceType
+  InstanceType: 
+    Type: String
+    Default: t2.small
+
+
+
+# Mappings:
+# # CentOS 7 
+#   AmiRegionMap:
+#   #Logical ID of the mappings
+#     us-east-1: 
+#       AMI: "ami-03f9d5ba58ed0d5c7"
+#     us-west-1: 
+#       AMI: "ami-08f331d291172de20"
+#     us-east-2: 
+#       AMI: "ami-05f9bcb23be1a0490"
+#     us-west-2: 
+#       AMI: "ami-06d6f80e4a284c4d6"
+#     ap-northeast-1: 
+#       AMI: "ami-0fe3ddf7c02c43e9c"
+
+
+
+Mappings:
+# Need CentOS 7 or above. The AMIs below are CentOS stream 8
+# change to centos stream9 See below
+  AmiRegionMap:
+  #Logical ID of the mappings
+    us-east-1: 
+      AMI: "ami-0cdb8266fcd5d3d63"
+    us-west-1: 
+      AMI: "ami-0789ea4ecdab43447"
+    us-east-2: 
+      AMI: "ami-013f9ee48907190f5"
+    us-west-2: 
+      AMI: "ami-031e6a417aae9b9f6"
+    ap-northeast-1: 
+      AMI: "ami-0270524b69d8dc369"
+
+# Mappings:
+# #Try centos stream 9
+#   AmiRegionMap:
+#   #Logical ID of the mappings
+#     us-east-1: 
+#       AMI: "ami-0df2a11dd1fe1f8e3"
+#     us-west-1: 
+#       AMI: "ami-084c852d3275c2e20"
+#     us-east-2: 
+#       AMI: "ami-011d59a275b482a49"
+#     us-west-2: 
+#       AMI: "ami-094cc0ced7b91fcf0"
+#     ap-northeast-1: 
+#       AMI: "ami-074c801439a538a43"
+
+
+
+Resources:
+  DB01qaInst:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      ImageId: !FindInMap
+#        Fn::FindInMap:
+        - AmiRegionMap
+        - !Ref AWS::Region
+        - AMI
+      Tags:
+        - Key: "Name"
+          Value: !Join 
+            - ""
+            - - "db01-qa-vpro in "
+              - !Ref AWS::Region
+      SecurityGroups: 
+        - !Ref vprodbSG
+
+      # THIS IS NOT REQUIRED as there is no required S3 accss in UserData for db01qa
+      # IamInstanceProfile:
+        # this is from cicds3role.yaml
+        # Fn::ImportValue:
+        #   Fn::Sub: "${RoleTempName}-VPS3RoleProfileName"
+        #   # RoleTempName is specified in the Parameters and is the VPInstanceProfile data from cicds3role.yaml
+        #   # this is the exported variable VPS3RoleProfileName from cicds3role.yaml 
+        #   # This value will be stored in IamInstanceProfile and attached to this instance.
+        #   # This will give S3 full access so that the instance can download data from the S3 bucket (see below)
+      
+      UserData:
+        Fn::Base64:                                # YAML makes userdata much cleaner
+          !Sub |
+              #!/bin/bash
+              DATABASE_PASS='admin123'
+              yum update -y
+              yum install epel-release -y
+              yum install mariadb-server -y
+              yum install wget git unzip -y
+
+              #mysql_secure_installation
+              sed -i 's/^127.0.0.1/0.0.0.0/' /etc/my.cnf
+
+              # starting & enabling mariadb-server
+              systemctl start mariadb
+              systemctl enable mariadb
+
+              #restore the dump file for the application
+              cd /tmp/
+              wget https://raw.githubusercontent.com/devopshydclub/vprofile-repo/vp-rem/src/main/resources/db_backup.sql
+              mysqladmin -u root password "$DATABASE_PASS"
+              mysql -u root -p"$DATABASE_PASS" -e "UPDATE mysql.user SET Password=PASSWORD('$DATABASE_PASS') WHERE User='root'"
+              mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
+              mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.user WHERE User=''"
+              mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%'"
+              mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES"
+              mysql -u root -p"$DATABASE_PASS" -e "create database accounts"
+              mysql -u root -p"$DATABASE_PASS" -e "grant all privileges on accounts.* TO 'admin'@'localhost' identified by 'admin123'"
+              mysql -u root -p"$DATABASE_PASS" -e "grant all privileges on accounts.* TO 'admin'@'%' identified by 'admin123'"
+              mysql -u root -p"$DATABASE_PASS" accounts < /tmp/db_backup.sql
+              mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES"
+
+              # Restart mariadb-server
+              systemctl restart mariadb
+
+
+
+              # SETUP MEMCACHE
+              yum install memcached -y
+              systemctl start memcached
+              systemctl enable memcached
+              systemctl status memcached
+              memcached -p 11211 -U 11111 -u memcached -d
+              sleep 30
+
+
+
+              # SETUP RABBITMQ
+              #yum install socat -y
+              #yum install wget -y
+
+              # these links are outdated and not longer valid
+
+              # wget https://www.rabbitmq.com/releases/rabbitmq-server/v3.6.10/rabbitmq-server-3.6.10-1.el7.noarch.rpm
+              # rpm --import https://www.rabbitmq.com/rabbitmq-release-signing-key.asc
+              # yum update
+              # rpm -Uvh rabbitmq-server-3.6.10-1.el7.noarch.rpm
+
+              # systemctl start rabbitmq-server
+              # systemctl enable rabbitmq-server
+              # systemctl status rabbitmq-server
+              # echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
+              # rabbitmqctl add_user test test
+              # rabbitmqctl set_user_tags test administrator
+              # systemctl restart rabbitmq-server
+
+
+
+
+              # Use project 23 Section 25 updated scripts to install RabbitMQ
+              # https://www.rabbitmq.com/docs/install-debian
+              # this is for debian and not for centos stream 8 or 9
+
+              # sudo apt-get install curl gnupg apt-transport-https -y
+              # ## Team RabbitMQ's main signing key
+              # curl -1sLf "https://keys.openpgp.org/vks/v1/by-fingerprint/0A9AF2115F4687BD29803A206B73A36E6026DFCA" | sudo gpg --dearmor | sudo tee /usr/share/keyrings/com.rabbitmq.team.gpg > /dev/null
+              # ## Community mirror of Cloudsmith: modern Erlang repository
+              # curl -1sLf https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key | sudo gpg --dearmor | sudo tee /usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg > /dev/null
+              # ## Community mirror of Cloudsmith: RabbitMQ repository
+              # curl -1sLf https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key | sudo gpg --dearmor | sudo tee /usr/share/keyrings/rabbitmq.9F4587F226208342.gpg > /dev/null
+
+              # ## Add apt repositories maintained by Team RabbitMQ
+              # sudo tee /etc/apt/sources.list.d/rabbitmq.list <<EOF
+              # ## Provides modern Erlang/OTP releases
+              # ##
+              # deb [signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa1.novemberain.com/rabbitmq/rabbitmq-erlang/deb/ubuntu jammy main
+              # deb-src [signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa1.novemberain.com/rabbitmq/rabbitmq-erlang/deb/ubuntu jammy main
+
+              # # another mirror for redundancy
+              # deb [signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa2.novemberain.com/rabbitmq/rabbitmq-erlang/deb/ubuntu jammy main
+              # deb-src [signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa2.novemberain.com/rabbitmq/rabbitmq-erlang/deb/ubuntu jammy main
+
+              # ## Provides RabbitMQ
+              # ##
+              # deb [signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa1.novemberain.com/rabbitmq/rabbitmq-server/deb/ubuntu jammy main
+              # deb-src [signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa1.novemberain.com/rabbitmq/rabbitmq-server/deb/ubuntu jammy main
+
+              # # another mirror for redundancy
+              # deb [signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa2.novemberain.com/rabbitmq/rabbitmq-server/deb/ubuntu jammy main
+              # deb-src [signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa2.novemberain.com/rabbitmq/rabbitmq-server/deb/ubuntu jammy main
+              # EOF
+
+              # ## Update package indices
+              # sudo apt-get update -y
+
+              # ## Install Erlang packages
+              # sudo apt-get install -y erlang-base \
+              #                         erlang-asn1 erlang-crypto erlang-eldap erlang-ftp erlang-inets \
+              #                         erlang-mnesia erlang-os-mon erlang-parsetools erlang-public-key \
+              #                         erlang-runtime-tools erlang-snmp erlang-ssl \
+              #                         erlang-syntax-tools erlang-tftp erlang-tools erlang-xmerl
+
+              # ## Install rabbitmq-server and its dependencies
+              # sudo apt-get install rabbitmq-server -y --fix-missing
+
+
+
+
+
+
+              # For centos 8 and 9 use rpm and yum/dnf
+              # https://www.rabbitmq.com/docs/install-rpm
+              # RabbitMQ RPM package will require sudo privileges to install and manage. 
+
+              ## BLOCK 0
+
+              ## primary RabbitMQ signing key.  ADD sudo
+              #sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc'
+              ## modern Erlang repository
+              #sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key'
+              ## RabbitMQ server repository
+              #sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key'
+
+              ## BLOCK 0 END
+
+              # In order to use the Yum repository, a .repo file (e.g. rabbitmq.repo) has to be added under the /etc/yum.repos.d/ directory. 
+              # The contents of the file will vary slightly between distributions (e.g. CentOS Stream 9, CentOS Stream 8).
+              
+
+
+              # ########## Centos9
+              # # In /etc/yum.repos.d/rabbitmq.repo
+
+              # ##
+              # ## Zero dependency Erlang RPM
+              # ##
+
+              # sudo cat <<EOT>> /etc/yum.repos.d/rabbitmq.repo
+              # [modern-erlang]
+              # name=modern-erlang-el9
+              # # uses a Cloudsmith mirror @ yum.novemberain.com.
+              # # Unlike Cloudsmith, it does not have any traffic quotas
+              # baseurl=https://yum1.novemberain.com/erlang/el/9/$basearch
+              #         https://yum2.novemberain.com/erlang/el/9/$basearch
+              #         https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/9/$basearch
+              # repo_gpgcheck=1
+              # enabled=1
+              # gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
+              # gpgcheck=1
+              # sslverify=1
+              # sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              # metadata_expire=300
+              # pkg_gpgcheck=1
+              # autorefresh=1
+              # type=rpm-md
+              # [modern-erlang-noarch]
+              # name=modern-erlang-el9-noarch
+              # # uses a Cloudsmith mirror @ yum.novemberain.com.
+              # # Unlike Cloudsmith, it does not have any traffic quotas
+              # baseurl=https://yum1.novemberain.com/erlang/el/9/noarch
+              #         https://yum2.novemberain.com/erlang/el/9/noarch
+              #         https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/9/noarch
+              # repo_gpgcheck=1
+              # enabled=1
+              # gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
+              #        https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+              # gpgcheck=1
+              # sslverify=1
+              # sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              # metadata_expire=300
+              # pkg_gpgcheck=1
+              # autorefresh=1
+              # type=rpm-md
+              # [modern-erlang-source]
+              # name=modern-erlang-el9-source
+              # # uses a Cloudsmith mirror @ yum.novemberain.com.
+              # # Unlike Cloudsmith, it does not have any traffic quotas
+              # baseurl=https://yum1.novemberain.com/erlang/el/9/SRPMS
+              #         https://yum2.novemberain.com/erlang/el/9/SRPMS
+              #         https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/9/SRPMS
+              # repo_gpgcheck=1
+              # enabled=1
+              # gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
+              #        https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+              # gpgcheck=1
+              # sslverify=1
+              # sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              # metadata_expire=300
+              # pkg_gpgcheck=1
+              # autorefresh=1
+              # ##
+              # ## RabbitMQ Server
+              # ##
+              # [rabbitmq-el9]
+              # name=rabbitmq-el9
+              # baseurl=https://yum2.novemberain.com/rabbitmq/el/9/$basearch
+              #         https://yum1.novemberain.com/rabbitmq/el/9/$basearch
+              #         https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/9/$basearch
+              # repo_gpgcheck=1
+              # enabled=1
+              # # Cloudsmith's repository key and RabbitMQ package signing key
+              # gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
+              #        https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+              # gpgcheck=1
+              # sslverify=1
+              # sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              # metadata_expire=300
+              # pkg_gpgcheck=1
+              # autorefresh=1
+              # type=rpm-md
+              # [rabbitmq-el9-noarch]
+              # name=rabbitmq-el9-noarch
+              # baseurl=https://yum2.novemberain.com/rabbitmq/el/9/noarch
+              #         https://yum1.novemberain.com/rabbitmq/el/9/noarch
+              #         https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/9/noarch
+              # repo_gpgcheck=1
+              # enabled=1
+              # # Cloudsmith's repository key and RabbitMQ package signing key
+              # gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
+              #        https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+              # gpgcheck=1
+              # sslverify=1
+              # sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              # metadata_expire=300
+              # pkg_gpgcheck=1
+              # autorefresh=1
+              # type=rpm-md
+              # [rabbitmq-el9-source]
+              # name=rabbitmq-el9-source
+              # baseurl=https://yum2.novemberain.com/rabbitmq/el/9/SRPMS
+              #         https://yum1.novemberain.com/rabbitmq/el/9/SRPMS
+              #         https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/9/SRPMS
+              # repo_gpgcheck=1
+              # enabled=1
+              # gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
+              # gpgcheck=0
+              # sslverify=1
+              # sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              # metadata_expire=300
+              # pkg_gpgcheck=1
+              # autorefresh=1
+              # type=rpm-md
+              # EOT
+              
+
+
+              ####### BLOCK START
+
+              # ###### Centos8.  Having same issue with this. 
+              # # The repo for Centos9 is not working. Try ami for centos8 (modern-erlang-el8)
+              # # modern-erlang-el9  Error: Failed to download metadata for repo 'modern-erlang': Cannot download repomd.xml: 
+              # # Cannot download repodata/repomd.xml: All mirrors were tried
+              # # Change AMI from centos9 to 8
+
+              # sudo cat <<EOT>> /etc/yum.repos.d/rabbitmq.repo
+              # # In /etc/yum.repos.d/rabbitmq.repo
+
+              # ##
+              # ## Zero dependency Erlang RPM
+              # ##
+
+              # [modern-erlang]
+              # name=modern-erlang-el8
+              # # uses a Cloudsmith mirror @ yum.novemberain.com in addition to its Cloudsmith upstream.
+              # # Unlike Cloudsmith, the mirror does not have any traffic quotas
+              # baseurl=https://yum1.novemberain.com/erlang/el/8/$basearch
+              #         https://yum2.novemberain.com/erlang/el/8/$basearch
+              #         https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/8/$basearch
+              # repo_gpgcheck=1
+              # enabled=1
+              # gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
+              # gpgcheck=1
+              # sslverify=1
+              # sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              # metadata_expire=300
+              # pkg_gpgcheck=1
+              # autorefresh=1
+              # type=rpm-md
+
+              # [modern-erlang-noarch]
+              # name=modern-erlang-el8-noarch
+              # # uses a Cloudsmith mirror @ yum.novemberain.com.
+              # # Unlike Cloudsmith, it does not have any traffic quotas
+              # baseurl=https://yum1.novemberain.com/erlang/el/8/noarch
+              #         https://yum2.novemberain.com/erlang/el/8/noarch
+              #         https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/8/noarch
+              # repo_gpgcheck=1
+              # enabled=1
+              # gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
+              #        https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+              # gpgcheck=1
+              # sslverify=1
+              # sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              # metadata_expire=300
+              # pkg_gpgcheck=1
+              # autorefresh=1
+              # type=rpm-md
+
+              # [modern-erlang-source]
+              # name=modern-erlang-el8-source
+              # # uses a Cloudsmith mirror @ yum.novemberain.com.
+              # # Unlike Cloudsmith, it does not have any traffic quotas
+              # baseurl=https://yum1.novemberain.com/erlang/el/8/SRPMS
+              #         https://yum2.novemberain.com/erlang/el/8/SRPMS
+              #         https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/8/SRPMS
+              # repo_gpgcheck=1
+              # enabled=1
+              # gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
+              #        https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+              # gpgcheck=1
+              # sslverify=1
+              # sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              # metadata_expire=300
+              # pkg_gpgcheck=1
+              # autorefresh=1
+
+
+              # ##
+              # ## RabbitMQ Server
+              # ##
+
+              # [rabbitmq-el8]
+              # name=rabbitmq-el8
+              # baseurl=https://yum2.novemberain.com/rabbitmq/el/8/$basearch
+              #         https://yum1.novemberain.com/rabbitmq/el/8/$basearch
+              #         https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/8/$basearch
+              # repo_gpgcheck=1
+              # enabled=1
+              # # Cloudsmith's repository key and RabbitMQ package signing key
+              # gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
+              #        https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+              # gpgcheck=1
+              # sslverify=1
+              # sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              # metadata_expire=300
+              # pkg_gpgcheck=1
+              # autorefresh=1
+              # type=rpm-md
+
+              # [rabbitmq-el8-noarch]
+              # name=rabbitmq-el8-noarch
+              # baseurl=https://yum2.novemberain.com/rabbitmq/el/8/noarch
+              #         https://yum1.novemberain.com/rabbitmq/el/8/noarch
+              #         https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/8/noarch
+              # repo_gpgcheck=1
+              # enabled=1
+              # # Cloudsmith's repository key and RabbitMQ package signing key
+              # gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
+              #        https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
+              # gpgcheck=1
+              # sslverify=1
+              # sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              # metadata_expire=300
+              # pkg_gpgcheck=1
+              # autorefresh=1
+              # type=rpm-md
+
+              # [rabbitmq-el8-source]
+              # name=rabbitmq-el8-source
+              # baseurl=https://yum2.novemberain.com/rabbitmq/el/8/SRPMS
+              #         https://yum1.novemberain.com/rabbitmq/el/8/SRPMS
+              #         https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/8/SRPMS
+              # repo_gpgcheck=1
+              # enabled=1
+              # gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
+              # gpgcheck=0
+              # sslverify=1
+              # sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+              # metadata_expire=300
+              # pkg_gpgcheck=1
+              # autorefresh=1
+              # type=rpm-md
+              # EOT
+
+
+
+
+              # # add sudo
+              # sudo dnf update -y
+              # ## install these dependencies from standard OS repositories
+              # sudo dnf install socat logrotate -y
+              # ## install RabbitMQ and zero dependency Erlang
+              # sudo dnf install -y erlang rabbitmq-server
+  
+
+              # systemctl start rabbitmq-server
+              # systemctl enable rabbitmq-server
+              # systemctl status rabbitmq-server
+              # echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
+              # rabbitmqctl add_user test test
+              # rabbitmqctl set_user_tags test administrator
+              # systemctl restart rabbitmq-server
+
+              ###### BLOCK END
+
+
+
+
+
+
+              # ### Try this (this is for centos7)   This fails same 404
+              # curl -s https://packagecloud.io/install/repositories/rabbitmq/erlang/script.rpm.sh | sudo bash
+              # sudo yum clean all
+              # sudo yum makecache
+              # sudo yum install erlang -y
+              # curl -s https://packagecloud.io/install/repositories/rabbitmq/rabbitmq-server/script.rpm.sh | sudo bash
+              # sudo yum install rabbitmq-server -y
+              # rpm -qi rabbitmq-server
+              # systemctl start rabbitmq-server
+              # sudo systemctl enable rabbitmq-server
+              # sudo systemctl status rabbitmq-server
+
+              # echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
+              # rabbitmqctl add_user test test
+              # rabbitmqctl set_user_tags test administrator
+              # systemctl restart rabbitmq-server
+
+
+
+
+              ## MANUAL INSTALLATION OF RABBITMQ
+              # #sudo yum install socat -y
+              #sudo dnf install socat -y
+              # cd /tmp/
+              # curl -sfL -O https://github.com/rabbitmq/erlang-rpm/releases/download/v25.3.2.12/erlang-25.3.2.12-1.el8.x86_64.rpm
+              # sudo rpm -Uvh erlang-25.3.2.12-1.el8.x86_64.rpm 
+              # sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc'
+              # sudo rpm -Uvh https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.12.14/rabbitmq-server-3.12.14-1.el8.noarch.rpm
+              # sudo  systemctl start rabbitmq-server
+              # sudo systemctl enable rabbitmq-server
+              # sudo systemctl status rabbitmq-server
+              # sudo -i
+              # echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
+              # rabbitmqctl add_user test test
+              # rabbitmqctl set_user_tags test administrator
+              # systemctl restart rabbitmq-server
+
+  vprodbSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: vprodbSG
+      GroupDescription: Allow SSH & HTTP from myip
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: !Ref MyIP
+
+  # The app tomcat server needs access to the database, memcached, and rabbitmq services on all protocols
+  vprodbSGIngress:
+   Type: 'AWS::EC2::SecurityGroupIngress'
+   Properties:
+      GroupId: 
+        Fn::GetAtt:
+        - vprodbSG
+        - GroupId
+      IpProtocol: -1
+      # all  protocols
+      SourceSecurityGroupId:
+        Fn::ImportValue:
+            Fn::Sub: "${appStackName}-SGID"
+            # This returns the app01qa-SGID from teh app01qa.yaml file
+  
