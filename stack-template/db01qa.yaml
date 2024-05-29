@@ -119,11 +119,41 @@ Resources:
         Fn::Base64:                                # YAML makes userdata much cleaner
           !Sub |
               #!/bin/bash
+
+              ## MANUAL INSTALLATION OF RABBITMQ
+              #sudo yum install socat -y
+              sudo dnf install socat -y
+              cd /tmp/
+              curl -sfL -O https://github.com/rabbitmq/erlang-rpm/releases/download/v25.3.2.12/erlang-25.3.2.12-1.el8.x86_64.rpm
+              sudo rpm -Uvh erlang-25.3.2.12-1.el8.x86_64.rpm 
+              sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc'
+              sudo rpm -Uvh https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.12.14/rabbitmq-server-3.12.14-1.el8.noarch.rpm
+              sudo  systemctl start rabbitmq-server
+              sudo systemctl enable rabbitmq-server
+              sudo systemctl status rabbitmq-server
+              sudo -i
+              echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
+              rabbitmqctl add_user test test
+              rabbitmqctl set_user_tags test administrator
+              systemctl restart rabbitmq-server
+
+
+
+              # SETUP MEMCACHE
+              sudo yum install memcached -y
+              systemctl start memcached
+              systemctl enable memcached
+              systemctl status memcached
+              memcached -p 11211 -U 11111 -u memcached -d
+              sleep 30
+
+
+
               DATABASE_PASS='admin123'
-              yum update -y
-              yum install epel-release -y
-              yum install mariadb-server -y
-              yum install wget git unzip -y
+              #sudo yum update -y
+              sudo yum install epel-release -y
+              sudo yum install mariadb-server -y
+              sudo yum install wget git unzip -y
 
               #mysql_secure_installation
               sed -i 's/^127.0.0.1/0.0.0.0/' /etc/my.cnf
@@ -152,32 +182,35 @@ Resources:
 
 
 
-              # SETUP MEMCACHE
-              yum install memcached -y
-              systemctl start memcached
-              systemctl enable memcached
-              systemctl status memcached
-              memcached -p 11211 -U 11111 -u memcached -d
-              sleep 30
 
 
 
-              ## MANUAL INSTALLATION OF RABBITMQ
-              #sudo yum install socat -y
-              sudo dnf install socat -y
-              cd /tmp/
-              curl -sfL -O https://github.com/rabbitmq/erlang-rpm/releases/download/v25.3.2.12/erlang-25.3.2.12-1.el8.x86_64.rpm
-              sudo rpm -Uvh erlang-25.3.2.12-1.el8.x86_64.rpm 
-              sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc'
-              sudo rpm -Uvh https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.12.14/rabbitmq-server-3.12.14-1.el8.noarch.rpm
-              sudo  systemctl start rabbitmq-server
-              sudo systemctl enable rabbitmq-server
-              sudo systemctl status rabbitmq-server
-              sudo -i
-              echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
-              rabbitmqctl add_user test test
-              rabbitmqctl set_user_tags test administrator
-              systemctl restart rabbitmq-server
+              # # SETUP MEMCACHE
+              # sudo yum install memcached -y
+              # systemctl start memcached
+              # systemctl enable memcached
+              # systemctl status memcached
+              # memcached -p 11211 -U 11111 -u memcached -d
+              # sleep 30
+
+
+
+              # ## MANUAL INSTALLATION OF RABBITMQ
+              # #sudo yum install socat -y
+              # sudo dnf install socat -y
+              # cd /tmp/
+              # curl -sfL -O https://github.com/rabbitmq/erlang-rpm/releases/download/v25.3.2.12/erlang-25.3.2.12-1.el8.x86_64.rpm
+              # sudo rpm -Uvh erlang-25.3.2.12-1.el8.x86_64.rpm 
+              # sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc'
+              # sudo rpm -Uvh https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.12.14/rabbitmq-server-3.12.14-1.el8.noarch.rpm
+              # sudo  systemctl start rabbitmq-server
+              # sudo systemctl enable rabbitmq-server
+              # sudo systemctl status rabbitmq-server
+              # sudo -i
+              # echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
+              # rabbitmqctl add_user test test
+              # rabbitmqctl set_user_tags test administrator
+              # systemctl restart rabbitmq-server
 
   vprodbSG:
     Type: 'AWS::EC2::SecurityGroup'

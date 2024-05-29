@@ -120,10 +120,10 @@ Resources:
           !Sub |
               #!/bin/bash
               DATABASE_PASS='admin123'
-              yum update -y
-              yum install epel-release -y
-              yum install mariadb-server -y
-              yum install wget git unzip -y
+              #sudo yum update -y
+              sudo yum install epel-release -y
+              sudo yum install mariadb-server -y
+              sudo yum install wget git unzip -y
 
               #mysql_secure_installation
               sed -i 's/^127.0.0.1/0.0.0.0/' /etc/my.cnf
@@ -153,7 +153,7 @@ Resources:
 
 
               # SETUP MEMCACHE
-              yum install memcached -y
+              sudo yum install memcached -y
               systemctl start memcached
               systemctl enable memcached
               systemctl status memcached
