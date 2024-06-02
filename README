@@ -6,7 +6,7 @@
 Project25: Full stack CI/CD impementation using Cloudformation. tomcat, mysql, memcached, rabbitmq with Jenkins, Sonarqube and Nexus
 
 
-updaed UserData scripts are below
+updated UserData scripts are below
 The S3 restoration bucket code has been removed but can be added back in once the restoraton files are ready
 
 ## Jenkins
@@ -27,6 +27,7 @@ UserData:
 
             sudo apt-get update
             sudo apt-get install jenkins -y
+
 
 
 ## Nexus
@@ -74,7 +75,7 @@ UserData:
               echo 'run_as_user="nexus"' > /opt/nexus/$NEXUSDIR/bin/nexus.rc
               systemctl daemon-reload
               systemctl start nexus
-              systemctl enable nexus 
+              systemctl enable nexus  
 
 
 ## Sonarqube:
