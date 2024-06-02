@@ -211,7 +211,7 @@ UserData:
 
 ## Windows
 
-      UserData:
+           UserData:
         Fn::Base64:                                # YAML makes userdata much cleaner. This is 
           !Sub |
               <powershell>
@@ -277,11 +277,41 @@ UserData:
         Fn::Base64:                                # YAML makes userdata much cleaner
           !Sub |
               #!/bin/bash
+
+              ## MANUAL INSTALLATION OF RABBITMQ
+              #sudo yum install socat -y
+              sudo dnf install socat -y
+              cd /tmp/
+              curl -sfL -O https://github.com/rabbitmq/erlang-rpm/releases/download/v25.3.2.12/erlang-25.3.2.12-1.el8.x86_64.rpm
+              sudo rpm -Uvh erlang-25.3.2.12-1.el8.x86_64.rpm 
+              sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc'
+              sudo rpm -Uvh https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.12.14/rabbitmq-server-3.12.14-1.el8.noarch.rpm
+              sudo  systemctl start rabbitmq-server
+              sudo systemctl enable rabbitmq-server
+              sudo systemctl status rabbitmq-server
+              sudo -i
+              echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
+              rabbitmqctl add_user test test
+              rabbitmqctl set_user_tags test administrator
+              systemctl restart rabbitmq-server
+
+
+
+              # SETUP MEMCACHE
+              sudo yum install memcached -y
+              systemctl start memcached
+              systemctl enable memcached
+              systemctl status memcached
+              memcached -p 11211 -U 11111 -u memcached -d
+              sleep 30
+
+
+
               DATABASE_PASS='admin123'
-              yum update -y
-              yum install epel-release -y
-              yum install mariadb-server -y
-              yum install wget git unzip -y
+              #sudo yum update -y
+              sudo yum install epel-release -y
+              sudo yum install mariadb-server -y
+              sudo yum install wget git unzip -y
 
               #mysql_secure_installation
               sed -i 's/^127.0.0.1/0.0.0.0/' /etc/my.cnf
@@ -310,179 +340,35 @@ UserData:
 
 
 
-              # SETUP MEMCACHE
-              yum install memcached -y
-              systemctl start memcached
-              systemctl enable memcached
-              systemctl status memcached
-              memcached -p 11211 -U 11111 -u memcached -d
-              sleep 30
 
 
 
-              # SETUP RABBITMQ
-              yum install socat -y
-              yum install wget -y
-
-
-            # For centos 8 and 9 use rpm and yum/dnf
-              # https://www.rabbitmq.com/docs/install-rpm
-              # RabbitMQ RPM package will require sudo privileges to install and manage. 
-
-              ## primary RabbitMQ signing key.  ADD sudo
-              sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc'
-              ## modern Erlang repository
-              sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key'
-              ## RabbitMQ server repository
-              sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key'
-
-              # In order to use the Yum repository, a .repo file (e.g. rabbitmq.repo) has to be added under the /etc/yum.repos.d/ directory. 
-              # The contents of the file will vary slightly between distributions (e.g. CentOS Stream 9, CentOS Stream 8).
-
-              ###### Centos8.  
-              # The repo for Centos9 is not working. Try ami for centos8 (modern-erlang-el8)
-              # modern-erlang-el9  Error: Failed to download metadata for repo 'modern-erlang': Cannot download repomd.xml: 
-              # Cannot download repodata/repomd.xml: All mirrors were tried
-              # Change AMI from centos9 to 8
-
-              sudo cat <<EOT>> /etc/yum.repos.d/rabbitmq.repo
-              # In /etc/yum.repos.d/rabbitmq.repo
-
-              ##
-              ## Zero dependency Erlang RPM
-              ##
-
-              [modern-erlang]
-              name=modern-erlang-el8
-              # uses a Cloudsmith mirror @ yum.novemberain.com in addition to its Cloudsmith upstream.
-              # Unlike Cloudsmith, the mirror does not have any traffic quotas
-              baseurl=https://yum1.novemberain.com/erlang/el/8/$basearch
-                      https://yum2.novemberain.com/erlang/el/8/$basearch
-                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/8/$basearch
-              repo_gpgcheck=1
-              enabled=1
-              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
-              gpgcheck=1
-              sslverify=1
-              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
-              metadata_expire=300
-              pkg_gpgcheck=1
-              autorefresh=1
-              type=rpm-md
-
-              [modern-erlang-noarch]
-              name=modern-erlang-el8-noarch
-              # uses a Cloudsmith mirror @ yum.novemberain.com.
-              # Unlike Cloudsmith, it does not have any traffic quotas
-              baseurl=https://yum1.novemberain.com/erlang/el/8/noarch
-                      https://yum2.novemberain.com/erlang/el/8/noarch
-                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/8/noarch
-              repo_gpgcheck=1
-              enabled=1
-              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
-                     https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
-              gpgcheck=1
-              sslverify=1
-              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
-              metadata_expire=300
-              pkg_gpgcheck=1
-              autorefresh=1
-              type=rpm-md
-
-              [modern-erlang-source]
-              name=modern-erlang-el8-source
-              # uses a Cloudsmith mirror @ yum.novemberain.com.
-              # Unlike Cloudsmith, it does not have any traffic quotas
-              baseurl=https://yum1.novemberain.com/erlang/el/8/SRPMS
-                      https://yum2.novemberain.com/erlang/el/8/SRPMS
-                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/8/SRPMS
-              repo_gpgcheck=1
-              enabled=1
-              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
-                     https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
-              gpgcheck=1
-              sslverify=1
-              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
-              metadata_expire=300
-              pkg_gpgcheck=1
-              autorefresh=1
-
-
-              ##
-              ## RabbitMQ Server
-              ##
-
-              [rabbitmq-el8]
-              name=rabbitmq-el8
-              baseurl=https://yum2.novemberain.com/rabbitmq/el/8/$basearch
-                      https://yum1.novemberain.com/rabbitmq/el/8/$basearch
-                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/8/$basearch
-              repo_gpgcheck=1
-              enabled=1
-              # Cloudsmith's repository key and RabbitMQ package signing key
-              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
-                     https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
-              gpgcheck=1
-              sslverify=1
-              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
-              metadata_expire=300
-              pkg_gpgcheck=1
-              autorefresh=1
-              type=rpm-md
-
-              [rabbitmq-el8-noarch]
-              name=rabbitmq-el8-noarch
-              baseurl=https://yum2.novemberain.com/rabbitmq/el/8/noarch
-                      https://yum1.novemberain.com/rabbitmq/el/8/noarch
-                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/8/noarch
-              repo_gpgcheck=1
-              enabled=1
-              # Cloudsmith's repository key and RabbitMQ package signing key
-              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
-                     https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc
-              gpgcheck=1
-              sslverify=1
-              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
-              metadata_expire=300
-              pkg_gpgcheck=1
-              autorefresh=1
-              type=rpm-md
-
-              [rabbitmq-el8-source]
-              name=rabbitmq-el8-source
-              baseurl=https://yum2.novemberain.com/rabbitmq/el/8/SRPMS
-                      https://yum1.novemberain.com/rabbitmq/el/8/SRPMS
-                      https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/8/SRPMS
-              repo_gpgcheck=1
-              enabled=1
-              gpgkey=https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
-              gpgcheck=0
-              sslverify=1
-              sslcacert=/etc/pki/tls/certs/ca-bundle.crt
-              metadata_expire=300
-              pkg_gpgcheck=1
-              autorefresh=1
-              type=rpm-md
-              EOT
-
-
-              # add sudo
-              sudo dnf update -y
-              ## install these dependencies from standard OS repositories
-              sudo dnf install socat logrotate -y
-              ## install RabbitMQ and zero dependency Erlang
-              sudo dnf install -y erlang rabbitmq-server
+              # # SETUP MEMCACHE
+              # sudo yum install memcached -y
+              # systemctl start memcached
+              # systemctl enable memcached
+              # systemctl status memcached
+              # memcached -p 11211 -U 11111 -u memcached -d
+              # sleep 30
 
 
 
-
-              systemctl start rabbitmq-server
-              systemctl enable rabbitmq-server
-              systemctl status rabbitmq-server
-              echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
-              rabbitmqctl add_user test test
-              rabbitmqctl set_user_tags test administrator
-              systemctl restart rabbitmq-server
+              # ## MANUAL INSTALLATION OF RABBITMQ
+              # #sudo yum install socat -y
+              # sudo dnf install socat -y
+              # cd /tmp/
+              # curl -sfL -O https://github.com/rabbitmq/erlang-rpm/releases/download/v25.3.2.12/erlang-25.3.2.12-1.el8.x86_64.rpm
+              # sudo rpm -Uvh erlang-25.3.2.12-1.el8.x86_64.rpm 
+              # sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc'
+              # sudo rpm -Uvh https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.12.14/rabbitmq-server-3.12.14-1.el8.noarch.rpm
+              # sudo  systemctl start rabbitmq-server
+              # sudo systemctl enable rabbitmq-server
+              # sudo systemctl status rabbitmq-server
+              # sudo -i
+              # echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
+              # rabbitmqctl add_user test test
+              # rabbitmqctl set_user_tags test administrator
+              # systemctl restart rabbitmq-server
 
 
 
