@@ -57,7 +57,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DependsOn: App01qa
     Properties:
-      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template/db01qa.yaml
+      TemplateURL: https://s3.amazonaws.com/vprofile-cicd-templates-project25/stack-template/db01qa_NEW.yaml
       Parameters:
         KeyName: !Ref KeyPair
         MyIP: !Ref MyIP
