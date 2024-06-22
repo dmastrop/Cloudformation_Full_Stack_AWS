@@ -139,6 +139,8 @@ Resources:
               # rabbitmqctl set_user_tags test administrator
               # systemctl restart rabbitmq-server
 
+
+
               ## OFFICIAL INSTALLATION SCRIPT FOR RABBITMQ
               sudo cat <<EOT>> /etc/yum.repos.d/rabbitmq.repo
               ## https://www.rabbitmq.com/docs/install-rpm
