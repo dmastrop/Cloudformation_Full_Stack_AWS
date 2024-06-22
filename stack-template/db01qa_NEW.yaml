@@ -121,22 +121,22 @@ Resources:
               #!/bin/bash
 
 
-              ## MANUAL INSTALLATION OF RABBITMQ
-              #sudo yum install socat -y
-              sudo dnf install socat -y
-              cd /tmp/
-              curl -sfL -O https://github.com/rabbitmq/erlang-rpm/releases/download/v25.3.2.12/erlang-25.3.2.12-1.el8.x86_64.rpm
-              sudo rpm -Uvh erlang-25.3.2.12-1.el8.x86_64.rpm 
-              sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc'
-              sudo rpm -Uvh https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.12.14/rabbitmq-server-3.12.14-1.el8.noarch.rpm
-              sudo  systemctl start rabbitmq-server
-              sudo systemctl enable rabbitmq-server
-              sudo systemctl status rabbitmq-server
-              sudo -i
-              echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
-              rabbitmqctl add_user test test
-              rabbitmqctl set_user_tags test administrator
-              systemctl restart rabbitmq-server
+              # ## MANUAL INSTALLATION OF RABBITMQ
+              # #sudo yum install socat -y
+              # sudo dnf install socat -y
+              # cd /tmp/
+              # curl -sfL -O https://github.com/rabbitmq/erlang-rpm/releases/download/v25.3.2.12/erlang-25.3.2.12-1.el8.x86_64.rpm
+              # sudo rpm -Uvh erlang-25.3.2.12-1.el8.x86_64.rpm 
+              # sudo rpm --import 'https://github.com/rabbitmq/signing-keys/releases/download/3.0/rabbitmq-release-signing-key.asc'
+              # sudo rpm -Uvh https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.12.14/rabbitmq-server-3.12.14-1.el8.noarch.rpm
+              # sudo  systemctl start rabbitmq-server
+              # sudo systemctl enable rabbitmq-server
+              # sudo systemctl status rabbitmq-server
+              # sudo -i
+              # echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
+              # rabbitmqctl add_user test test
+              # rabbitmqctl set_user_tags test administrator
+              # systemctl restart rabbitmq-server
 
               ## PREREQUISITES
               cd /etc/yum.repos.d/
